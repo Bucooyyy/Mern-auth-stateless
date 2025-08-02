@@ -1,14 +1,24 @@
 import userModel from "../models/user.model.js";
 import { hashPassword, comparePassword } from "../lib/crypto.js";
+import { generateOtp, hashingOtp, compareOtp } from "../lib/otpgenerate.js";
 import { generateTokenAndSetCookie } from "../lib/tokenjwt.js";
 
 // Registration logic
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: "All fields are required" });
     }
+
+    // if (!validator.isEmail(email)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Please provide a valid email address"
+    //   });
+    // }
+
     const existingUser = await userModel.findOne({ email });
 
     if (existingUser) {
@@ -16,11 +26,14 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await hashPassword(password);
+    const plainOtp = generateOtp();
+    const hashedOtp = await hashingOtp(plainOtp);
 
     const newUser = new userModel({
       name,
       email,
       password: hashedPassword,
+      emailVerificationToken: hashedOtp,
       isMfaEnabled: false,
       role: "freeUser", // Default role
     });
@@ -29,6 +42,7 @@ export const register = async (req, res) => {
       await newUser.save();
       console.log("User registered successfully:", newUser);
       generateTokenAndSetCookie(res, newUser._id);
+      await sendVerificationEmail(newUser.email, plainOtp);
       return res.status(201).json({ success: true, message: "User registered successfully", user: newUser });
     }
   } catch (error) {
