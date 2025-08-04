@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["freeUser", "premiumUser", "admin"],
+      enum: ["freeUser", "premiumUser"],
       default: "freeUser",
     },
     avatar: {
@@ -52,11 +52,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    twoFA: {
+    MFA: {
       enabled: { type: Boolean, default: false },
       secret: { type: String, select: false },
     },
-    oauth: { googleId: String, githubId: String, xId: String, discordId: String },
+    oauth: { googleId: String, githubId: String, twitterId: String, discordId: String },
   },
   {
     timestamps: true,
@@ -72,7 +72,7 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ "oauth.googleId": 1 }, { sparse: true });
 userSchema.index({ "oauth.githubId": 1 }, { sparse: true });
-userSchema.index({ "oauth.xId": 1 }, { sparse: true });
+userSchema.index({ "oauth.twitterId": 1 }, { sparse: true });
 userSchema.index({ "oauth.discordId": 1 }, { sparse: true });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });

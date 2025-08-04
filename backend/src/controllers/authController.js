@@ -1,7 +1,7 @@
 import userModel from "../models/user.model.js";
 import { hashPassword, comparePassword } from "../lib/crypto.js";
 import { generateOtp, hashingOtp, compareOtp } from "../lib/otpgenerate.js";
-import { generateTokenAndSetCookie } from "../lib/tokenjwt.js";
+import { generateToken } from "../lib/tokenjwt.js";
 
 // Registration logic
 export const register = async (req, res) => {
@@ -135,7 +135,7 @@ export const requestPasswordReset = async (req, res) => {};
 
 export const confirmPasswordReset = async (req, res) => {};
 
-export const setup2FA = (req, res) => {
+export const setupMFA = (req, res) => {
   // 2FA setup logic
   try {
   } catch (error) {
@@ -147,7 +147,7 @@ export const setup2FA = (req, res) => {
   }
 };
 
-export const verify2FA = (req, res) => {
+export const verifyMFA = (req, res) => {
   // Verify 2FA logic
   try {
   } catch (error) {
@@ -159,7 +159,7 @@ export const verify2FA = (req, res) => {
   }
 };
 
-export const reset2FA = (req, res) => {
+export const resetMFA = (req, res) => {
   // Reset 2FA logic
   try {
   } catch (error) {
