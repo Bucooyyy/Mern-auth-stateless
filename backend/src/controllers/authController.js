@@ -1,7 +1,7 @@
 import userModel from "../models/user.model.js";
-import { hashPassword, comparePassword } from "../lib/crypto.js";
-import { generateOtp, hashingOtp, compareOtp } from "../lib/otpgenerate.js";
-import { generateToken } from "../lib/tokenjwt.js";
+import { hashPassword, comparePassword } from "../utils/crypto.js";
+import { generateOtp, hashingOtp, compareOtp } from "../utils/otpgenerate.js";
+import { generateToken } from "../utils/tokenjwt.js";
 
 // Registration logic
 export const register = async (req, res) => {
@@ -26,14 +26,14 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await hashPassword(password);
-    const plainOtp = generateOtp();
-    const hashedOtp = await hashingOtp(plainOtp);
+    // const plainOtp = generateOtp();
+    // const hashedOtp = await hashingOtp(plainOtp);
 
     const newUser = new userModel({
       name,
       email,
       password: hashedPassword,
-      emailVerificationToken: hashedOtp,
+      // emailVerificationToken: hashedOtp,
       isMfaEnabled: false,
       role: "freeUser", // Default role
     });
@@ -41,8 +41,8 @@ export const register = async (req, res) => {
     if (newUser) {
       await newUser.save();
       console.log("User registered successfully:", newUser);
-      generateTokenAndSetCookie(res, newUser._id);
-      await sendVerificationEmail(newUser.email, plainOtp);
+      generateToken(res, newUser._id, newUser.role);
+      // await sendVerificationEmail(newUser.email, plainOtp);
       return res.status(201).json({ success: true, message: "User registered successfully", user: newUser });
     }
   } catch (error) {

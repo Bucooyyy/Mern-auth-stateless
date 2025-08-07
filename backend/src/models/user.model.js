@@ -32,10 +32,6 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    isMFAEnabled: {
-      type: Boolean,
-      required: false,
-    },
     emailVerificationToken: {
       type: String,
       select: false,
@@ -52,6 +48,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isMFAEnabled: {
+      type: Boolean,
+      required: false,
+    },
     MFA: {
       enabled: { type: Boolean, default: false },
       secret: { type: String, select: false },
@@ -63,7 +63,7 @@ const userSchema = new mongoose.Schema(
     toJSON: {
       transform: function (doc, ret) {
         delete ret.password;
-        delete ret.twoFA.secret;
+        delete ret.MFA.secret;
         return ret;
       },
     },

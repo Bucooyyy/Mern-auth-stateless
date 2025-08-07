@@ -16,6 +16,9 @@ passport.use(
       } else {
         return done(null, false);
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("JWT Strategy Error:", error);
+      return done(error, false);
+    }
   })
 );
