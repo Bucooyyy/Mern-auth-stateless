@@ -5,7 +5,7 @@ export const generateToken = (res, userId, role) => {
   try {
     const accessToken = jwt.sign({ userId, role, type: "access" }, process.env.JWT_SECRET, { expiresIn: "15m" });
 
-    res.cookie("accessToken", accessToken, {
+    res.cookie("token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -14,7 +14,7 @@ export const generateToken = (res, userId, role) => {
 
     const refreshToken = jwt.sign({ userId, role, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "90d" });
 
-    res.cookie("refreshToken", refreshToken, {
+    res.cookie("token", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

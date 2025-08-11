@@ -1,0 +1,5 @@
+export default {
+  DISPOSABLE_EMAIL_DOMAINS: [],
+  RESERVED_USERNAMES: [],
+  INAPPROPRIATE_WORDS: [],
+};
