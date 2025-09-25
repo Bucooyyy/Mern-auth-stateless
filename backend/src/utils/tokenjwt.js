@@ -3,25 +3,29 @@ import redisClient from "../config/redis.config.js";
 
 export const generateToken = (res, userId, role) => {
   try {
-    const accessToken = jwt.sign({ userId, role, type: "access" }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    const accessToken = jwt.sign({ id: userId, role, type: "access" }, process.env.JWT_SECRET, { expiresIn: "15m" });
 
-    res.cookie("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000, // 15 menit
-    });
-
-    const refreshToken = jwt.sign({ userId, role, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "90d" });
-
-    res.cookie("token", refreshToken, {
+    res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       maxAge: 90 * 24 * 60 * 60 * 1000, // 90 hari
+      // maxAge: 15 * 60 * 1000, // 15 menit
     });
 
-    return { accessToken, refreshToken };
+    // const refreshToken = jwt.sign({ id: userId, role, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "90d" });
+
+    // res.cookie("refreshToken", refreshToken, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === "production",
+    //   sameSite: "strict",
+    //   maxAge: 90 * 24 * 60 * 60 * 1000, // 90 hari
+    // });
+
+    return {
+      accessToken,
+      // refreshToken
+    };
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -31,11 +35,28 @@ export const generateToken = (res, userId, role) => {
   }
 };
 
+export const verifyToken = (token) => {
+  try {
+    const isTokenVerified = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Token verified:", isTokenVerified);
+    return isTokenVerified;
+  } catch (error) {
+    console.error("Error verifying token:", error);
+    throw new Error("Failed to verify token");
+  }
+};
+
 export const blackListToken = async (token) => {
   try {
     const decodedToken = jwt.decode(token);
-    const expiry = decode.exp - Math.floor(Date.now() / 1000);
+    const expiry = decodedToken.exp - Math.floor(Date.now() / 1000);
+
+    if (expiry <= 0) {
+      console.warn("Token already expired, no need to blacklist");
+    }
+
     await redisClient.setEx(`blacklist:${decodedToken}`, expiry, "revoked");
+    console.log("Token blacklisted successfully");
   } catch (error) {
     console.error("Error blacklisting token:", error);
     throw new Error("Failed to blacklist token");

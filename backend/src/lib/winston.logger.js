@@ -15,7 +15,7 @@ const securityLogger = winston.createLogger({
   transports: [dailyRotateFileTransport, new winston.transports.Console()],
 });
 
-const logSecurityEvent = (event, userId, ip, userAgent) => {
+export const logSecurityEvent = (event, userId, ip, userAgent) => {
   securityLogger.info({
     event,
     userId,

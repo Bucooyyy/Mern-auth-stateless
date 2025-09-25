@@ -18,8 +18,9 @@ const userSchema = new mongoose.Schema(
         return !this.oauth;
       },
       minlength: 8,
+      select: false,
     },
-    role: {
+    roles: {
       type: String,
       enum: ["freeUser", "premiumUser"],
       default: "freeUser",
@@ -53,8 +54,10 @@ const userSchema = new mongoose.Schema(
       required: false,
     },
     MFA: {
+      secret: { type: String, select: false }, //Secret permanen setelah terverifikasi
+      tempSecret: { type: String, select: false }, // Secret sementara saat proses setup
+      qrCodeUrl: { type: String },
       enabled: { type: Boolean, default: false },
-      secret: { type: String, select: false },
     },
     oauth: { googleId: String, githubId: String, twitterId: String, discordId: String },
   },
@@ -77,6 +80,6 @@ userSchema.index({ "oauth.discordId": 1 }, { sparse: true });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });
 
-const userModel = mongoose.models.user || mongoose.model("user", userSchema);
+const userModel = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default userModel;

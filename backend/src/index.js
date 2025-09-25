@@ -2,13 +2,13 @@ import express, { urlencoded } from "express";
 import cors from "cors";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
-import passport from "passport";
+import passport from "./lib/passport-strategies/jwt.passport.js";
 import authRoutes from "./routes/auth.route.js";
 
 import "./lib/passport-strategies/jwt.passport.js";
 import { connectDB } from "./config/db.config.js";
 import { connectRedis } from "./config/redis.config.js";
-import { authLimiter, loginLimiter, MFAlimiter } from "./middleware/ratelimiter.js";
+import { authLimiter, loginLimiter, MFAlimiter } from "./middleware/rateLimiter.js";
 
 const app = express();
 

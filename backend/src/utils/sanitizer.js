@@ -15,8 +15,8 @@ export const sanitizeInput = (value, options = {}) => {
 
   const xssOptions = {
     whiteList: {
-      ...(allowLinks && { a: ["href", "title", "rel"] }),
-      ...(allowImages && { img: ["src", "alt", "width", "height"] }),
+      // ...(allowLinks && { a: ["href", "title", "rel"] }),
+      // ...(allowImages && { img: ["src", "alt", "width", "height"] }),
       ...(context === "body" && {
         b: [],
         i: [],

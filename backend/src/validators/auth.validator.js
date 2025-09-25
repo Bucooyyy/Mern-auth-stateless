@@ -23,8 +23,8 @@ const emailValidation = body("email")
   });
 
 const usernameValidation = body("username")
-  .isLength({ min: 3, max: 30 })
-  .withMessage("Username must be between 3 and 30 characters long")
+  .isLength({ min: 3, max: 50 })
+  .withMessage("Username must be between 3 and 50 characters long")
   .matches(/^[a-zA-Z0-9_]+$/)
   .withMessage("Username can only contain letters, numbers, and underscores")
   .custom(async (value) => {
@@ -60,19 +60,12 @@ const usernameValidation = body("username")
   });
 
 export const validateRegistration = [
-  body("firstName")
+  body("username")
     .trim()
-    .isLength({ min: 2, max: 30 })
-    .withMessage("First name must between 2 and 30 characters long")
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Username must between 2 and 50 characters long")
     .matches(/^[a-zA-Z\s\-']+$/)
-    .withMessage("First name can only contain letters, spaces, hyphens, and apostrophes"),
-
-  body("lastName")
-    .trim()
-    .isLength({ min: 2, max: 30 })
-    .withMessage("Last name must be between 2 and 30 characters long")
-    .matches(/^[a-zA-Z\s\-']+$/)
-    .withMessage("Last name can only contain letters, spaces, hyphens, and apostrophes"),
+    .withMessage("Username can only contain letters, spaces, hyphens, and apostrophes"),
 
   usernameValidation.custom(async (value) => {
     const existingUser = await user.findOne({ username: value });
@@ -99,7 +92,7 @@ export const validateRegistration = [
     return true;
   }),
 
-  body("marketingConsent").optional().isBoolean().withMessage("Marketing consent must be a boolean value"),
+  ,
 ];
 
 export const validateLogin = [
@@ -220,12 +213,6 @@ export const validateAdminUserUpdate = [
   body("role").optional().isIn(["user", "premium", "admin"]).withMessage("Invalid role"),
 
   body("isEmailVerified").optional().isBoolean().withMessage("Email verification status must be a boolean"),
-
-  body("aiCredits").optional().isInt({ min: 0, max: 10000 }).withMessage("AI credits must be between 0 and 10000"),
-
-  body("subscription.plan").optional().isIn(["free", "basic", "premium"]).withMessage("Invalid subscription plan"),
-
-  body("subscription.status").optional().isIn(["active", "canceled", "expired"]).withMessage("Invalid subscription status"),
 ];
 
 export const validateUserSearch = [
