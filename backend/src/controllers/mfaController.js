@@ -67,7 +67,7 @@ export const verifyMFA = async (req, res) => {
       secret: user.MFA.tempSecret,
       encoding: "base32",
       token: token,
-      window: 3, // Allow a window of 3 time steps (3 seconds)
+      window: 3, // Allow a window of 3 time steps (90 seconds)
     });
 
     if (verified) {

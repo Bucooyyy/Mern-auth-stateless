@@ -61,8 +61,6 @@ router.get("/debug-cookies", (req, res) => {
   // Test access token
   if (req.cookies.accessToken) {
     try {
-      const decoded = jwt.verify(req.cookies.accessToken, process.env.JWT_SECRET);
-      console.log("Access token valid:", decoded);
       res.json({
         success: true,
         accessToken: decoded,
@@ -92,6 +90,7 @@ router.post("/blacklist-token:", (req, res) => {
   console.log("=== ROute Blacklist ===");
   if (req.cookies.accessToken) {
     try {
+      blackListToken(req.cookies.accessToken);
     } catch (error) {
       console.log("No access token cookie found");
       res.json({
