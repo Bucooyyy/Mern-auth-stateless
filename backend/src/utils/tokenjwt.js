@@ -46,11 +46,18 @@ export const verifyToken = (token) => {
   }
 };
 
-export const blackListToken = async (token) => {
+export const blackListToken = async (accessToken, refreshToken) => {
   console.log("===BlacklistToken===");
 
   try {
-    const decodedToken = jwt.decode(token);
+    if (
+      !accessToken
+      // && !refreshToken
+    ) {
+      return { success: false, message: "No tokens provided" };
+    }
+
+    const decodedToken = jwt.decode(accessToken);
     const expiry = decodedToken.exp - Math.floor(Date.now() / 1000);
     if (expiry <= 0) {
       console.warn("Token already expired, no need to blacklist");

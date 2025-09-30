@@ -86,11 +86,15 @@ router.get("/debug-cookies", (req, res) => {
 });
 
 // Test BlackList
-router.post("/blacklist-token:", (req, res) => {
+router.post("/blacklist-token", (req, res) => {
   console.log("=== ROute Blacklist ===");
   if (req.cookies.accessToken) {
     try {
       blackListToken(req.cookies.accessToken);
+      res.json({
+        success: true,
+        message: "Token blacklisted",
+      });
     } catch (error) {
       console.log("No access token cookie found");
       res.json({

@@ -91,12 +91,12 @@ export const login = async (req, res) => {
       return res.status(400).json({ success: false, message: "Incorrect password" });
     }
 
-    if (user.MFA.enabled) {
-      const mFATokenVeirfy = speakeasy.totp.verify({
-        secret: user.MFA.secret,
-        encoding: "base32",
-      });
-    }
+    // if (user.MFA.enabled) {
+    //   const mFATokenVeirfy = speakeasy.totp.verify({
+    //     secret: user.MFA.secret,
+    //     encoding: "base32",
+    //   });
+    // }
     const {
       accessToken,
       // refreshToken
