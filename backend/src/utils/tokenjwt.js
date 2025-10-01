@@ -57,7 +57,7 @@ export const blackListToken = async (accessToken, refreshToken) => {
       return { success: false, message: "No tokens provided" };
     }
 
-    const decodedToken = jwt.decode(accessToken);
+    const decodedToken = jwt.verify(accessToken, process.env.JWT_SECRET);
     const expiry = decodedToken.exp - Math.floor(Date.now() / 1000);
     if (expiry <= 0) {
       console.warn("Token already expired, no need to blacklist");
@@ -71,14 +71,20 @@ export const blackListToken = async (accessToken, refreshToken) => {
   }
 };
 
-export const isTokenBlacklisted = async (token) => {
+export const isTokenBlacklisted = async (accessToken, refreshToken) => {
   // validasi input token
-  if (!token || typeof token !== "string") {
-    console.warn("Invalid token format");
+  if (!accessToken || typeof accessToken !== "string") {
+    console.warn("Invalid access token format");
+    return true;
+  }
+
+  if (!refreshToken || typeof refreshToken !== "string") {
+    console.warn("Invalid refresh token format");
     return true;
   }
   try {
-    const isBlackListed = await redisClient.get(`blacklist:${token}`);
+    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
+    const isBlackListed = await redisClient.get(`blacklist:${decoded}`);
     return isBlackListed === "revoked";
   } catch (error) {
     console.error("Error checking token blacklist:", error);
