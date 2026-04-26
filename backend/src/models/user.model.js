@@ -5,30 +5,33 @@ const userSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
     },
     email: {
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
       required: function () {
-        return !this.oauth;
+        return !this.oauth || !Object.values(this.oauth).some(Boolean);
       },
       minlength: 8,
       select: false,
     },
     roles: {
       type: String,
-      enum: ["freeUser", "premiumUser"],
-      default: "freeUser",
+      enum: ["free", "premium", "admin"],
+      default: "free",
     },
     avatar: {
       type: String,
       default: null,
     },
+    // Email Verif
     isAccountVerified: {
       type: Boolean,
       default: false,
@@ -41,6 +44,7 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Pass Reset
     resetPasswordToken: {
       type: String,
       select: false,
@@ -49,6 +53,7 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // MFA
     isMFAEnabled: {
       type: Boolean,
       required: false,
@@ -56,21 +61,32 @@ const userSchema = new mongoose.Schema(
     MFA: {
       secret: { type: String, select: false }, //Secret permanen setelah terverifikasi
       tempSecret: { type: String, select: false }, // Secret sementara saat proses setup
-      qrCodeUrl: { type: String },
+      qrCodeUrl: { type: String, default: null },
       enabled: { type: Boolean, default: false },
     },
-    oauth: { googleId: String, githubId: String, twitterId: String, discordId: String },
+    oauth: {
+      googleId: { type: String, default: null },
+      githubId: { type: String, default: null },
+      twitterId: { type: String, default: null },
+      discordId: { type: String, default: null },
+    },
+    refreshTokens: {
+      type: [String],
+      select: false,
+      default: [],
+    },
   },
   {
     timestamps: true,
     toJSON: {
-      transform: function (doc, ret) {
+      transform: function (_doc, ret) {
         delete ret.password;
-        delete ret.MFA.secret;
+        if (ret.MFA) delete ret.MFA.secret;
+        delete ret.refreshTokens;
         return ret;
       },
     },
-  }
+  },
 );
 
 userSchema.index({ "oauth.googleId": 1 }, { sparse: true });
@@ -79,7 +95,9 @@ userSchema.index({ "oauth.twitterId": 1 }, { sparse: true });
 userSchema.index({ "oauth.discordId": 1 }, { sparse: true });
 userSchema.index({ role: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ emailVerificationToken: 1 }, { sparse: true });
+userSchema.index({ resetPasswordToken: 1 }, { sparse: true });
 
-const userModel = mongoose.models.User || mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
-export default userModel;
+export default User;

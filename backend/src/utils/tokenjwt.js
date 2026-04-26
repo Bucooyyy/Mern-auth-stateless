@@ -9,22 +9,21 @@ export const generateToken = (res, userId, role) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 90 * 24 * 60 * 60 * 1000, // 90 hari
-      // maxAge: 15 * 60 * 1000, // 15 menit
+      maxAge: 15 * 60 * 1000, // 15 menit
     });
 
-    // const refreshToken = jwt.sign({ id: userId, role, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "90d" });
+    const refreshToken = jwt.sign({ id: userId, role, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "90d" });
 
-    // res.cookie("refreshToken", refreshToken, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === "production",
-    //   sameSite: "strict",
-    //   maxAge: 90 * 24 * 60 * 60 * 1000, // 90 hari
-    // });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 hari
+    });
 
     return {
       accessToken,
-      // refreshToken
+      refreshToken,
     };
   } catch (error) {
     res.status(500).json({
