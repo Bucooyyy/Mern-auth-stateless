@@ -1,5 +1,24 @@
 import winston from "winston";
-import "winston-daily-rotate-file";
+import DailyRotateFile from "winston-daily-rotate-file";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LOG_DIR = path.join(__dirname, "../../logs");
+
+const maskSensitive = winston.format((info) => {
+  const SENSITIVE_KEYS = ["password", "secret", "token", "refreshToken", "accessToken"];
+  if (info.meta && typeof info.meta === "object") {
+    info.meta = Object.fromEntries(
+      Object.entries(info.meta).map(([kMaxLength, v]) =>
+        SENSITIVE_KEYS.some((s) => kMaxLength.toLowerCase().includes(s)) ? [k, "[REDACTED]"] : [k, v],
+      ),
+    );
+  }
+  return info;
+});
+
+const consoleFormat;
 
 const dailyRotateFileTransport = new winston.transports.DailyRotateFile({
   filename: "logs/security-%DATE%.log",

@@ -1,5 +1,13 @@
 import { body, param, query } from "express-validator";
+import { validationResult } from "express-validator";
 import user from "../models/user.model.js";
+
+export const checkValidation = (req, _res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new
+  }
+};
 
 const passwordValidation = body("password")
   .isLength({ min: 8, max: 128 })
@@ -215,18 +223,18 @@ export const validateAdminUserUpdate = [
   body("isEmailVerified").optional().isBoolean().withMessage("Email verification status must be a boolean"),
 ];
 
-export const validateUserSearch = [
-  query("page").optional().isInt({ min: 1 }).withMessage("Page must be a positive integer"),
+// export const validateUserSearch = [
+//   query("page").optional().isInt({ min: 1 }).withMessage("Page must be a positive integer"),
 
-  query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("Limit must be between 1 and 100"),
+//   query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("Limit must be between 1 and 100"),
 
-  query("search").optional().trim().isLength({ min: 1, max: 100 }).withMessage("Search term must be between 1 and 100 characters"),
+//   query("search").optional().trim().isLength({ min: 1, max: 100 }).withMessage("Search term must be between 1 and 100 characters"),
 
-  query("role").optional().isIn(["user", "premium", "admin"]).withMessage("Invalid role filter"),
+//   query("role").optional().isIn(["user", "premium", "admin"]).withMessage("Invalid role filter"),
 
-  query("isEmailVerified").optional().isBoolean().withMessage("Email verification filter must be a boolean"),
+//   query("isEmailVerified").optional().isBoolean().withMessage("Email verification filter must be a boolean"),
 
-  query("sortBy").optional().isIn(["createdAt", "updatedAt", "username", "email", "aiCredits"]).withMessage("Invalid sort field"),
+//   query("sortBy").optional().isIn(["createdAt", "updatedAt", "username", "email", "aiCredits"]).withMessage("Invalid sort field"),
 
-  query("sortOrder").optional().isIn(["asc", "desc"]).withMessage("Sort order must be asc or desc"),
-];
+//   query("sortOrder").optional().isIn(["asc", "desc"]).withMessage("Sort order must be asc or desc"),
+// ];
