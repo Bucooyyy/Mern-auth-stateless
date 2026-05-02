@@ -1,28 +1,30 @@
 import rateLimit from "express-rate-limit";
 
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: "Too many authentication requests. Please wait before trying again.",
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.ip + (req.body.email || ""),
-});
+const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000; // 15 min
+const MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
 
-export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per windowMs
-  message: "Too many login attempts, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.ip + (req.body.email || ""),
-});
+const limiterFactory = (windowMs, max, message) =>
+  rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+    legacyHeaders: false,
+    message: { success: false, message },
+  });
 
-export const MFAlimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 6 minutes
-  max: 5,
-  message: "Too many 2FA attempts, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.ip + (req.body.email || ""),
-});
+// General limiter applied to all routes
+export const generalLimiter = limiterFactory(WINDOW_MS, MAX, "Too many requests, please try again later.");
+
+// Stricter limiter for sensitive auth endpoints
+export const authLimiter = limiterFactory(
+  15 * 60 * 1000, // 15 min window
+  20,
+  "Too many authentication attempts, please try again in 15 minutes.",
+);
+
+// Tightest limit for password reset / MFA
+export const sensitiveLimiter = limiterFactory(
+  60 * 60 * 1000, // 1 hour window
+  10,
+  "Too many sensitive requests, please try again in 1 hour.",
+);

@@ -1,23 +1,23 @@
-import { createClient } from "redis";
+import Redis from "ioredis";
+import logger from "../config/winston.logger.js";
 
-const redisClient = createClient({
-  username: process.env.REDIS_USERNAME,
-  password: process.env.REDIS_PASSWORD,
-  socket: {
-    host: process.env.REDIS_URL,
-    port: process.env.REDIS_PORT,
-  },
-});
+let redisClient;
 
-redisClient.on("connect", () => console.log(`Redis client connected on: ${process.env.REDIS_URL}:${process.env.REDIS_PORT}`));
-redisClient.on("error", (error) => console.log("Redis client error", error));
+/**
+ * Returns a singleton Redis client.
+ * Lazy-initialised on first call.
+ */
+export const getRedisClient = () => {
+  if (redisClient) return redisClient;
 
-export const connectRedis = async () => {
-  try {
-    await redisClient.connect();
-  } catch (error) {
-    console.log("Redis connection error:", error);
-  }
+  redisClient = new Redis(process.env.REDIS_URI, {
+    retryStrategy: (times) => Math.min(times * 100, 3000),
+    maxRetriesPerRequest: null, // let ioredis handle retries
+  });
+
+  redisClient.on("connect", () => logger.info("Redis connected"));
+  redisClient.on("error", (err) => logger.error("Redis error", { error: err.message }));
+  redisClient.on("reconnecting", () => logger.warn("Redis reconnecting..."));
+
+  return redisClient;
 };
-
-export default redisClient;

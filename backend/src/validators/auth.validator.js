@@ -1,240 +1,97 @@
-import { body, param, query } from "express-validator";
+import { body, param } from "express-validator";
 import { validationResult } from "express-validator";
-import user from "../models/user.model.js";
+import { BadRequestError } from "../utils/errors.js";
 
+// ─── Error-checking middleware ────────────────────────────────────────────────
+/**
+ * Run after validation chains. Collects errors and throws a BadRequestError
+ * so the central error handler produces a consistent response.
+ */
 export const checkValidation = (req, _res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new
+    throw new BadRequestError("Validation failed", errors.array());
   }
+  next();
 };
 
-const passwordValidation = body("password")
-  .isLength({ min: 8, max: 128 })
-  .withMessage("Password must be between 8 and 128 characters long")
-  .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-  .withMessage("Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character (@$!%*?&)");
+// ─── Validation chains ────────────────────────────────────────────────────────
+export const validateRegister = [
+  body("name").trim().notEmpty().withMessage("Name is required").isLength({ min: 2, max: 50 }).withMessage("Name must be 2–50 characters"),
 
-const emailValidation = body("email")
-  .isEmail()
-  .withMessage("Please provide a valid email address")
-  .normalizeEmail()
-  .isLength({ max: 254 })
-  .withMessage("Email address is too long")
-  .custom(async (value, { req }) => {
-    const disposableDomains = ["10minutemail.com", "tempmail.org", "guerrillamail.com", "mailinator.com", "yopmail.com", "temp-mail.org"];
-    const domain = value.split("@")[1];
-    if (disposableDomains.includes(domain)) {
-      throw new Error("Disposable email addresses are not allowed");
-    }
-    return true;
-  });
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Invalid email format").normalizeEmail(),
 
-const usernameValidation = body("username")
-  .isLength({ min: 3, max: 50 })
-  .withMessage("Username must be between 3 and 50 characters long")
-  .matches(/^[a-zA-Z0-9_]+$/)
-  .withMessage("Username can only contain letters, numbers, and underscores")
-  .custom(async (value) => {
-    const reservedUsernames = [
-      "admin",
-      "root",
-      "administrator",
-      "mod",
-      "moderator",
-      "support",
-      "help",
-      "api",
-      "www",
-      "mail",
-      "ftp",
-      "blog",
-      "shop",
-      "store",
-      "test",
-      "demo",
-      "guest",
-      "user",
-      "null",
-      "undefined",
-      "system",
-      "config",
-      "settings",
-    ];
-    if (reservedUsernames.includes(value.toLowerCase())) {
-      throw new Error("This username is reserved and cannot be used");
-    }
-    return true;
-  });
-
-export const validateRegistration = [
-  body("username")
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage("Username must between 2 and 50 characters long")
-    .matches(/^[a-zA-Z\s\-']+$/)
-    .withMessage("Username can only contain letters, spaces, hyphens, and apostrophes"),
-
-  usernameValidation.custom(async (value) => {
-    const existingUser = await user.findOne({ username: value });
-    if (existingUser) {
-      throw new Error("Username is already taken");
-    }
-    return true;
-  }),
-
-  emailValidation.custom(async (value) => {
-    const existingUser = await user.findOne({ email: value });
-    if (existingUser) {
-      throw new Error("Email is already registered");
-    }
-    return true;
-  }),
-
-  passwordValidation,
-  body("confirmPassword").custom((value, { req }) => {
-    if (value !== req.body.password) {
-      throw new Error("Password confirmation does not match password");
-    }
-
-    return true;
-  }),
-
-  ,
+  body("password")
+    .notEmpty()
+    .withMessage("Password is required")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters")
+    .matches(/[A-Z]/)
+    .withMessage("Password must contain an uppercase letter")
+    .matches(/[0-9]/)
+    .withMessage("Password must contain a number")
+    .matches(/[^A-Za-z0-9]/)
+    .withMessage("Password must contain a special character"),
 ];
 
 export const validateLogin = [
-  body("identifier").notEmpty().withMessage("Email or username is required").trim().isLength({ max: 254 }).withMessage("Identifier is too long"),
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Invalid email format").normalizeEmail(),
 
-  body("password").notEmpty().withMessage("Password is required").isLength({ min: 1, max: 128 }).withMessage("Password length is invalid"),
-
-  // body("rememberMe").optional().isBoolean().withMessage("Remember me must be a boolean value"),
+  body("password").notEmpty().withMessage("Password is required"),
 ];
 
-export const validatePasswordReset = [
-  param("token")
-    .isLength({ min: 64, max: 64 })
-    .withMessage("Invalid reset token format")
-    .matches(/^[a-f0-9]{64}$/)
-    .withMessage("Reset token must be a valid hexadecimal string"),
+export const validateForgotPassword = [
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Invalid email format").normalizeEmail(),
+];
 
-  passwordValidation,
+export const validateResetPassword = [
+  body("token").trim().notEmpty().withMessage("Reset token is required"),
 
-  body("confirmPassword").custom((value, { req }) => {
-    if (value !== req.body.password) {
-      throw new Error("Password confirmation does not match password");
-    }
-    return true;
-  }),
+  body("password")
+    .notEmpty()
+    .withMessage("Password is required")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters")
+    .matches(/[A-Z]/)
+    .withMessage("Password must contain an uppercase letter")
+    .matches(/[0-9]/)
+    .withMessage("Password must contain a number")
+    .matches(/[^A-Za-z0-9]/)
+    .withMessage("Password must contain a special character"),
+];
+
+export const validateMfaToken = [
+  body("token")
+    .trim()
+    .notEmpty()
+    .withMessage("TOTP token is required")
+    .isLength({ min: 6, max: 6 })
+    .withMessage("TOTP token must be exactly 6 digits")
+    .isNumeric()
+    .withMessage("TOTP token must be numeric"),
+];
+
+export const validateMfaVerify = [
+  body("mfaToken").trim().notEmpty().withMessage("MFA session token is required"),
+
+  body("token")
+    .trim()
+    .notEmpty()
+    .withMessage("TOTP code is required")
+    .isLength({ min: 6, max: 6 })
+    .withMessage("TOTP code must be exactly 6 digits")
+    .isNumeric()
+    .withMessage("TOTP code must be numeric"),
+];
+
+export const validateRoleChange = [
+  param("userId").isMongoId().withMessage("Invalid user ID"),
+
+  body("role").notEmpty().withMessage("Role is required").isIn(["free", "premium", "admin"]).withMessage("Role must be free, premium, or admin"),
 ];
 
 export const validateProfileUpdate = [
-  body("firstName")
-    .optional()
-    .trim()
-    .isLength({ min: 2, max: 30 })
-    .withMessage("First name must be between 2 and 50 characters long")
-    .matches(/^[a-zA-Z\s\-']+$/)
-    .withMessage("First name can only contain letters, spaces, hyphens, and apostrophes"),
+  body("name").optional().trim().isLength({ min: 2, max: 50 }).withMessage("Name must be 2–50 characters"),
 
-  body("lastName")
-    .optional()
-    .trim()
-    .isLength({ min: 2, max: 30 })
-    .withMessage("Last name must be between 2 and 50 characters long")
-    .matches(/^[a-zA-Z\s\-']+$/)
-    .withMessage("Last name can only contain letters, spaces, hyphens, and apostrophes"),
-
-  body("username")
-    .optional()
-    .isLength({ min: 3, max: 30 })
-    .withMessage("Username must be between 3 and 30 characters long")
-    .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage("Username can only contain letters, numbers, and underscores")
-    .custom(async (value, { req }) => {
-      if (value && req.user.username !== value) {
-        const existingUser = await User.findOne({ username: value });
-        if (existingUser) {
-          throw new Error("Username is already taken");
-        }
-      }
-      return true;
-    }),
-
-  // body("email")
-  //   .optional()
-  //   .isEmail()
-  //   .withMessage("Please provide a valid email address")
-  //   .normalizeEmail()
-  //   .custom(async (value, { req }) => {
-  //     if (value && req.user.email !== value) {
-  //       const existingUser = await User.findOne({ email: value });
-  //       if (existingUser) {
-  //         throw new Error("Email address is already registered");
-  //       }
-  //     }
-  //     return true;
-  //   }),
+  body("avatar").optional().isURL().withMessage("Avatar must be a valid URL"),
 ];
-
-export const validateEmailVerification = [
-  param("token")
-    .isLength({ min: 64, max: 64 })
-    .withMessage("Invalid verification token format")
-    .matches(/^[a-f0-9]{64}$/)
-    .withMessage("Verification token must be a valid hexadecimal string"),
-];
-
-// export const validateResendEmailVerification = [
-//   emailValidation
-// ];
-
-export const validateRefreshToken = [
-  body("refreshToken").notEmpty().withMessage("Refresh token is required").isJWT().withMessage("Invalid refresh token format"),
-];
-
-export const validateTwoFactorSetup = [
-  body("secret").notEmpty().withMessage("Two-factor secret is required").isLength({ min: 32, max: 32 }).withMessage("Invalid secret format"),
-
-  body("token")
-    .notEmpty()
-    .withMessage("Verification token is required")
-    .isNumeric()
-    .withMessage("Token must be numeric")
-    .isLength({ min: 6, max: 6 })
-    .withMessage("Token must be 6 digits"),
-];
-
-export const validateTwoFactorVerification = [
-  body("token")
-    .notEmpty()
-    .withMessage("Two-factor token is required")
-    .isNumeric()
-    .withMessage("Token must be numeric")
-    .isLength({ min: 6, max: 6 })
-    .withMessage("Token must be 6 digits"),
-];
-
-export const validateAdminUserUpdate = [
-  param("userId").isMongoId().withMessage("Invalid user ID"),
-
-  body("role").optional().isIn(["user", "premium", "admin"]).withMessage("Invalid role"),
-
-  body("isEmailVerified").optional().isBoolean().withMessage("Email verification status must be a boolean"),
-];
-
-// export const validateUserSearch = [
-//   query("page").optional().isInt({ min: 1 }).withMessage("Page must be a positive integer"),
-
-//   query("limit").optional().isInt({ min: 1, max: 100 }).withMessage("Limit must be between 1 and 100"),
-
-//   query("search").optional().trim().isLength({ min: 1, max: 100 }).withMessage("Search term must be between 1 and 100 characters"),
-
-//   query("role").optional().isIn(["user", "premium", "admin"]).withMessage("Invalid role filter"),
-
-//   query("isEmailVerified").optional().isBoolean().withMessage("Email verification filter must be a boolean"),
-
-//   query("sortBy").optional().isIn(["createdAt", "updatedAt", "username", "email", "aiCredits"]).withMessage("Invalid sort field"),
-
-//   query("sortOrder").optional().isIn(["asc", "desc"]).withMessage("Sort order must be asc or desc"),
-// ];

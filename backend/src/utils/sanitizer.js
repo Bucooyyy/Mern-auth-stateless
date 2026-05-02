@@ -1,57 +1,46 @@
 import xss from "xss";
+import { BadRequestError } from "../errors/error.js";
+/**
+ * Recursively sanitize a value against XSS attacks.
+ * Handles strings, arrays, and plain objects.
+ */
 
-export const sanitizeInput = (value, options = {}) => {
-  if (typeof value !== "string") return value;
-
-  const { context = "body", allowLinks = false, allowImages = false } = options;
-
-  if (context === "password" || context === "token") {
-    return value;
+const MAX_DEPTH = 5; // Limit recursion depth to prevent DoS
+const MAX_STRING_LENGTH = 10000; // Limit string length to prevent abuse
+const sanitize = (value, currentDepth = 0) => {
+  if (currentDepth > MAX_DEPTH) {
+    throw new BadRequestError("Payload too deep: Potential DoS attack detected.");
   }
 
-  if (context === "email") {
-    return value.toLowerCase().trim();
-  }
-
-  const xssOptions = {
-    whiteList: {
-      // ...(allowLinks && { a: ["href", "title", "rel"] }),
-      // ...(allowImages && { img: ["src", "alt", "width", "height"] }),
-      ...(context === "body" && {
-        b: [],
-        i: [],
-        strong: [],
-        em: [],
-        u: [],
-        p: [],
-        br: [],
-        ul: [],
-        ol: [],
-        li: [],
-        blockquote: [],
-        code: [],
-        pre: [],
-      }),
-    },
-    stripIgnoreTag: true,
-    escapeHtml: (html) => {
-      if (context === "attribute") {
-        return html.replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "<").replace(/>/g, ">");
-      }
-      return html;
-    },
-  };
-  return xss(value.trim(), xssOptions);
-};
-
-export const sanitizeObject = (obj, options = {}) => {
-  if (typeof obj !== "object" || obj === null) return;
-
-  Object.keys(obj).forEach((key) => {
-    if (obj[key] && typeof obj[key] === "string") {
-      obj[key] = sanitizeInput(obj[key], options);
-    } else if (typeof obj[key] === "object") {
-      sanitizeObject(obj[key], options);
+  if (typeof value === "string") {
+    if (value.length > MAX_STRING_LENGTH) {
+      throw new BadRequestError("String too long: Potential DoS attack detected.");
     }
-  });
+    return xss(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitize(item, currentDepth + 1));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitize(v, currentDepth + 1)]));
+  }
+
+  return value;
 };
+
+/**
+ * Express middleware: sanitize req.body, req.query, and req.params in-place.
+ */
+const xssSanitize = (req, _res, next) => {
+  try {
+    if (req.body) req.body = sanitize(req.body);
+    if (req.query) req.query = sanitize(req.query);
+    if (req.params) req.params = sanitize(req.params);
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export default xssSanitize;
