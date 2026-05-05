@@ -1,92 +1,100 @@
-import jwt, { decode } from "jsonwebtoken";
-import redisClient from "../config/redis.config.js";
+import jwt from "jsonwebtoken";
+import getRedisClient from "../config/redis.js";
+import logger from "../config/logger.js";
 
-export const generateToken = (res, userId, role) => {
+const redis = () => getRedisClient(); // lazy accessor
+
+// ─── Access Token ─────────────────────────────────────────────────────────────
+/**
+ * Generate a short-lived access token.
+ * Payload: { userId, role }
+ */
+export const generateAccessToken = (user) =>
+  jwt.sign({ userId: user._id.toString(), role: user.role }, process.env.JWT_ACCESS_SECRET, {
+    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+  });
+
+// ─── Refresh Token ────────────────────────────────────────────────────────────
+/**
+ * Generate a long-lived refresh token.
+ * Payload: { userId }
+ */
+export const generateRefreshToken = (user) =>
+  jwt.sign({ userId: user._id.toString() }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" });
+
+// ─── MFA Temporary Token ──────────────────────────────────────────────────────
+/**
+ * Short-lived token (5 min) issued when login requires MFA.
+ * The client must pass this to POST /mfa/verify.
+ */
+export const generateMfaToken = (user) =>
+  jwt.sign({ userId: user._id.toString(), purpose: "mfa_verification" }, process.env.JWT_MFA_SECRET, {
+    expiresIn: process.env.JWT_MFA_EXPIRES_IN || "5m",
+  });
+
+export const verifyMfaToken = (token) => jwt.verify(token, process.env.JWT_MFA_SECRET);
+
+// ─── Refresh Token Verification ───────────────────────────────────────────────
+export const verifyRefreshToken = (token) => jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+
+// ─── Redis Blacklist ──────────────────────────────────────────────────────────
+/**
+ * Blacklist a token in Redis until its natural expiry.
+ * Key pattern: blacklist:<token>
+ */
+export const blacklistToken = async (token, exp) => {
   try {
-    const accessToken = jwt.sign({ id: userId, role, type: "access" }, process.env.JWT_SECRET, { expiresIn: "15m" });
-
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000, // 15 menit
-    });
-
-    const refreshToken = jwt.sign({ id: userId, role, type: "refresh" }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "90d" });
-
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 hari
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-    };
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to generate token",
-      error: error.message,
-    });
-  }
-};
-
-export const verifyToken = (token) => {
-  try {
-    const isTokenVerified = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("Token verified:", isTokenVerified);
-    return isTokenVerified;
-  } catch (error) {
-    console.error("Error verifying token:", error);
-    throw new Error("Failed to verify token");
-  }
-};
-
-export const blackListToken = async (accessToken, refreshToken) => {
-  console.log("===BlacklistToken===");
-
-  try {
-    if (
-      !accessToken
-      // && !refreshToken
-    ) {
-      return { success: false, message: "No tokens provided" };
+    const now = Math.floor(Date.now() / 1000);
+    const ttl = exp - now;
+    if (ttl > 0) {
+      await redis().set(`blacklist:${token}`, "1", "EX", ttl);
+      logger.debug("Token blacklisted", { ttl });
     }
-
-    const decodedToken = jwt.verify(accessToken, process.env.JWT_SECRET);
-    const expiry = decodedToken.exp - Math.floor(Date.now() / 1000);
-    if (expiry <= 0) {
-      console.warn("Token already expired, no need to blacklist");
-    }
-
-    await redisClient.setEx(`blacklist:${decodedToken}`, expiry, "revoked");
-    console.log("Token blacklisted successfully");
-  } catch (error) {
-    console.error("Error blacklisting token:", error);
-    throw new Error("Failed to blacklist token");
+  } catch (err) {
+    logger.error("Failed to blacklist token", { error: err.message });
   }
 };
 
-export const isTokenBlacklisted = async (accessToken, refreshToken) => {
-  // validasi input token
-  if (!accessToken || typeof accessToken !== "string") {
-    console.warn("Invalid access token format");
-    return true;
-  }
-
-  if (!refreshToken || typeof refreshToken !== "string") {
-    console.warn("Invalid refresh token format");
-    return true;
-  }
+/**
+ * Check whether a token has been blacklisted.
+ */
+export const isTokenBlacklisted = async (token) => {
   try {
-    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
-    const isBlackListed = await redisClient.get(`blacklist:${decoded}`);
-    return isBlackListed === "revoked";
-  } catch (error) {
-    console.error("Error checking token blacklist:", error);
-    return true;
+    const val = await redis().get(`blacklist:${token}`);
+    return val !== null;
+  } catch (err) {
+    logger.error("Failed to check blacklist", { error: err.message });
+    return false; // fail open — token check happens upstream anyway
   }
+};
+
+// ─── Cookie helper ────────────────────────────────────────────────────────────
+/** Milliseconds represented by the refresh expiry env var (default 7d). */
+const REFRESH_MS = (() => {
+  const raw = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+  const match = raw.match(/^(\d+)([smhd])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+  const [, n, unit] = match;
+  const multipliers = { s: 1e3, m: 60e3, h: 3600e3, d: 86400e3 };
+  return Number(n) * multipliers[unit];
+})();
+
+/**
+ * Set the refresh token as a secure HTTP-only cookie on the response.
+ */
+export const setRefreshTokenCookie = (res, refreshToken) => {
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+    maxAge: REFRESH_MS,
+    path: "/",
+  });
+};
+
+/**
+ * Clear the refresh token cookie.
+ */
+export const clearRefreshTokenCookie = (res) => {
+  res.clearCookie("refreshToken", { path: "/" });
 };
