@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
-import getRedisClient from "../config/redis.js";
-import logger from "../config/logger.js";
+import { getRedisClient } from "../config/redis.config.js";
+import logger from "../config/winston.logger.js";
 
 const redis = () => getRedisClient(); // lazy accessor
 

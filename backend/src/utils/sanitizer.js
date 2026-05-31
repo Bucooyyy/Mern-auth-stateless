@@ -28,6 +28,18 @@ const sanitize = (value, currentDepth = 0) => {
   return value;
 };
 
+export const sanitizeInput = (value) => sanitize(value);
+
+export const sanitizeObject = (obj) => {
+  if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    for (let key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        obj[key] = sanitize(obj[key]);
+      }
+    }
+  }
+};
+
 /**
  * Express middleware: sanitize req.body, req.query, and req.params in-place.
  */

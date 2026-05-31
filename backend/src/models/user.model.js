@@ -22,6 +22,16 @@ const userSchema = new mongoose.Schema(
       minlength: 8,
       select: false,
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    lockUntil: {
+      type: Date,
+      default: null,
+      select: false,
+    },
     roles: {
       type: String,
       enum: ["free", "premium", "admin"],

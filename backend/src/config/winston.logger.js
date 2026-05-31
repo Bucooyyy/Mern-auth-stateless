@@ -65,4 +65,14 @@ if (process.env.NODE_ENV !== "production") {
   logger.add(new winston.transports.Console({ format: consoleFormat }));
 }
 
+export const logSecurityEvent = (eventType, userId, ip, userAgent, additionalData = {}) => {
+  logger.warn(`Security Event: ${eventType}`, {
+    eventType,
+    userId,
+    ip,
+    userAgent,
+    ...additionalData
+  });
+};
+
 export default logger;

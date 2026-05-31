@@ -8,6 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # dont commit these files
+.AGENTS-project.yaml
+.agents
 .env
 node_modules
 dist

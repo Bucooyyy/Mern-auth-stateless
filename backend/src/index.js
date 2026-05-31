@@ -2,30 +2,39 @@ import express, { urlencoded } from "express";
 import cors from "cors";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
-import passport from "./lib/passport-strategies/jwt.passport.js";
+import helmet from "helmet";
+import mongoSanitize from "express-mongo-sanitize";
+import morgan from "morgan";
+import passport from "./lib/passport-strategies/passport.js";
 import authRoutes from "./routes/auth.route.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger.config.js";
 
-import "./lib/passport-strategies/jwt.passport.js";
 import { connectDB } from "./config/db.config.js";
-import { connectRedis } from "./config/redis.config.js";
-import { authLimiter, loginLimiter, MFAlimiter } from "./middleware/rateLimiter.js";
+import { getRedisClient } from "./config/redis.config.js";
+import { generalLimiter } from "./middleware/rateLimiter.js";
 
 const app = express();
 
 // Middlewares
-app.use(express.json({ authLimiter })); // allows us to parse incoming requests: req.body
-app.use(urlencoded({ authLimiter, extended: true }));
-app.use(cookieParser({ secret: process.env.COOKIE_PARSER })); // // allows us to parse incoming cookies
-app.use(cors({ credentials: true }));
+app.use(generalLimiter);
+app.use(helmet()); // Secure HTTP headers
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev")); // HTTP request logger
+app.use(express.json({ limit: "10kb" })); // parse incoming requests with JSON payloads
+app.use(urlencoded({ extended: true, limit: "10kb" })); // parse incoming requests with urlencoded payloads
+app.use(mongoSanitize()); // Prevent NoSQL injection
+app.use(cookieParser({ secret: process.env.COOKIE_PARSER })); // parse incoming cookies
+app.use(cors({ credentials: true, origin: process.env.FRONTEND_URL || "http://localhost:5173" }));
 app.use(passport.initialize());
 
 // Routes
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api/auth", authRoutes);
 
 //  Port and DB Connection
 const port = process.env.PORT || 5000;
 connectDB();
-connectRedis();
+getRedisClient();
 try {
   app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

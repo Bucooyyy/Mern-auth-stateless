@@ -1,5 +1,6 @@
 import passport from "passport";
-import { strategies as JwtStrategy, ExtractJwt } from "passport-jwt";
+import pkg from "passport-jwt";
+const { Strategy: JwtStrategy, ExtractJwt } = pkg;
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as DiscordStrategy } from "passport-discord";
