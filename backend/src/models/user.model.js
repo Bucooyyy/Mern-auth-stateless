@@ -63,15 +63,9 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    // MFA
-    isMFAEnabled: {
-      type: Boolean,
-      required: false,
-    },
     MFA: {
       secret: { type: String, select: false }, //Secret permanen setelah terverifikasi
       tempSecret: { type: String, select: false }, // Secret sementara saat proses setup
-      qrCodeUrl: { type: String, default: null },
       enabled: { type: Boolean, default: false },
     },
     oauth: {

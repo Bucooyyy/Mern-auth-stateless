@@ -3,8 +3,6 @@ import qrcode from "qrcode";
 import logger from "../../config/winston.logger.js";
 import { encryptData, decryptData } from "../../utils/crypto.js";
 
-const ISSUER = "MernAuthV.me";
-
 /**
  * Generates an MFA secret for the user.
  * @param {string} email - User's email to embed in the app name.
@@ -12,8 +10,8 @@ const ISSUER = "MernAuthV.me";
  */
 export const generateSecret = (email) => {
   return speakeasy.generateSecret({
-    name: `${ISSUER} (${email})`,
-    issuer: ISSUER,
+    name: `${process.env.ISSUER} (${email})`,
+    issuer: process.env.ISSUER,
     length: 20,
   });
 };
