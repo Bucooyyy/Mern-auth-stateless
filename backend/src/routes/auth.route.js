@@ -1,5 +1,4 @@
 import { Router } from "express";
-import passport from "passport";
 import jwt from "jsonwebtoken";
 import {
   register,
@@ -13,7 +12,6 @@ import {
   confirmPasswordReset,
   oauthSuccess,
 } from "../controllers/authController.js";
-import { enableMFA, verifyMFA, resetMFA, disableMFA } from "../controllers/mfaController.js";
 
 import { sanitizeMiddleware, fieldSanitizeMiddleware } from "../middleware/sanitize.js";
 import requireAuth from "../middleware/requireAuth.js";
@@ -42,34 +40,8 @@ router.post("/verify-email", sensitiveLimiter, confirmEmailVerification);
 router.post("/forgot-password", sensitiveLimiter, requestPasswordReset);
 router.post("/reset-password", sensitiveLimiter, confirmPasswordReset);
 
-//  MFA setup
-router.post("/mfa/enable", requireAuth, enableMFA);
-// Verify Route
-router.post("/mfa/verify", requireAuth, verifyMFA);
-//  Reset MFA  Route
-router.post("/mfa/reset", requireAuth, resetMFA);
-
-router.post("/mfa/disable", requireAuth, disableMFA);
-
 // Auth Status Route
 router.get("/profil", requireAuth, authStatus);
-
-// OAuth Routes
-// Google
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-router.get("/google/callback", passport.authenticate("google", { session: false }), oauthSuccess);
-
-// GitHub
-router.get("/github", passport.authenticate("github", { scope: ["user:email"] }));
-router.get("/github/callback", passport.authenticate("github", { session: false }), oauthSuccess);
-
-// Discord
-router.get("/discord", passport.authenticate("discord"));
-router.get("/discord/callback", passport.authenticate("discord", { session: false }), oauthSuccess);
-
-// Twitter
-router.get("/twitter", passport.authenticate("twitter"));
-router.get("/twitter/callback", passport.authenticate("twitter", { session: false }), oauthSuccess);
 
 // Tambahkan di routes untuk debugging
 router.get("/debug-cookies", (req, res) => {

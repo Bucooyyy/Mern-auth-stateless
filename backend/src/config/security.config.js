@@ -1,31 +1,5 @@
 export default {
-  XSS_POLICIES: {
-    DEFAULT: {
-      context: "body",
-      allowLinks: true,
-      allowImages: false,
-    },
-    NAME: {
-      context: "name",
-      allowLinks: false,
-      allowImages: false,
-    },
-    EMAIL: {
-      context: "email",
-      allowLinks: false,
-      allowImages: false,
-    },
-    PASSWORD: {
-      context: "password",
-      allowLinks: false,
-      allowImages: false,
-    },
-    USERNAME: {
-      context: "username",
-      allowLinks: false,
-      allowImages: false,
-    },
-  },
+  // Daftar domain email sekali pakai (untuk validasi)
   DISPOSABLE_EMAIL_DOMAINS: [
     "10minutemail.com",
     "tempmail.org",
@@ -37,6 +11,8 @@ export default {
     "maildrop.cc",
     "throwawaymail.com",
   ],
+
+  // Username yang tidak boleh didaftarkan
   RESERVED_USERNAMES: [
     "owner",
     "master",
@@ -66,4 +42,19 @@ export default {
     "config",
     "settings",
   ],
+
+  // Opsional: konfigurasi untuk library xss jika Anda ingin kustomisasi tag yang diizinkan
+  XSS_OPTIONS: {
+    whiteList: {
+      a: ["href", "title", "target"],
+      b: [],
+      i: [],
+      strong: [],
+      em: [],
+      p: [],
+      br: [],
+    },
+    stripIgnoreTag: true,
+    stripIgnoreTagBody: ["script", "style"],
+  },
 };

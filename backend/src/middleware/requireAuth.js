@@ -1,19 +1,54 @@
 import passport from "passport";
+import logger, { logSecurityEvent } from "../config/winston.logger";
+import { UnauthorizedError } from "../errors/error";
 
 const requireAuth = (req, res, next) => {
-  console.log("=== Auth Middleware Called ===");
-  console.log("Request cookies:", req.cookies);
-  passport.authenticate("jwt", { session: false }, (err, userModel, info) => {
-    console.log("Passport result - err:", err, "user:", userModel, "info:", info);
+  if (process.env.NODE_ENV !== "production") {
+    logger.debug("Request cookies in requireAuth", { cookies: req.cookies });
+  }
 
-    if (err) {
-      return next(err);
+  passport.authenticate("jwt", { session: false }, (error, user, info) => {
+    if (process.env.NODE_ENV !== "production") {
+      logger.debug("Passport result - err:", error, "user:", user, "info:", info);
     }
-    if (!userModel) {
-      return res.status(401).json({ success: false, message: "Unauthorized: Invalid or expired token.", info: info });
+
+    if (error) {
+      logger.error("Error during authentication", {
+        error: error.message,
+        stack: error.stack,
+        path: req.originalUrl,
+        ip: req.ip,
+      });
+      return next(error);
     }
-    console.log("User authenticated:", userModel.email);
-    req.user = userModel;
+    if (!user) {
+      logSecurityEvent("JWT_AUTH_FAILED", null, req.ip, req.headers["user-agent"], {
+        path: req.originalUrl,
+        method: req.method,
+        reason: info?.message || "Authentication failed",
+      });
+      logger.warn("JWT authentication failed", {
+        error: info?.message || "Authentication failed",
+        path: req.originalUrl,
+        ip: req.ip,
+      });
+
+      return next(new UnauthorizedError("Invalid or expired token"));
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      logger.debug("User authenticated successfully in requireAuth", {
+        userId: user._id,
+        email: user.email,
+      });
+    }
+
+    logger.info("User authenticated successfully via JWT", {
+      userId: user._id,
+      email: user.email,
+      path: req.originalUrl,
+    });
+    req.user = user;
     next();
   })(req, res, next);
 };
