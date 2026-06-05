@@ -7,51 +7,63 @@ import { AppError, BadRequestError, InternalServerError, UnauthorizedError } fro
 import { sendSuccess } from "../utils/response.js";
 import logger from "../config/winston.logger.js";
 
-export const mfaSetup = async (req, res) => {
-  const user = req.user;
+export const setupMFA = async (req, res, next) => {
+  try {
+    const user = req.user;
 
-  if (user.MFA?.enabled) {
-    throw new BadRequestError("MFA is already enabled for this account");
+    if (user.MFA?.enabled) {
+      throw new BadRequestError("MFA is already enabled for this account");
+    }
+
+    const secret = mfaService.generateSecret(user.email);
+    const qrCodeUrl = await mfaService.generateQRCode(secret.otpauth_url);
+
+    await User.findByIdAndUpdate(user._id, {
+      "MFA.tempSecret": mfaService.encryptSecret(secret.base32),
+    });
+
+    logger.info("MFA setup initiated", { userId: user._id, email: user.email });
+
+    return sendSuccess(res, 200, "MFA setup initiated. Scan the QR code with your authenticator app.", {
+      qrCode: qrCodeUrl,
+      secret: secret.base32,
+    });
+  } catch (error) {
+    next(error);
   }
-
-  const secret = mfaService.generateSecret(user.email);
-  const qrCodeUrl = await mfaService.generateQRCode(secret.otpauth_url);
-
-  await User.findByIdAndUpdate(user._id, {
-    "MFA.tempSecret": mfaService.encryptSecret(secret.base32),
-  });
-
-  logger.info("MFA setup initiated", { userId: user._id, email: user.email });
-
-  return sendSuccess(res, 200, "MFA setup initiated. Scan the QR code with your authenticator app.", {
-    qrCode: qrCodeUrl,
-    secret: secret.base32,
-  });
 };
 
-export const enableMFA = async (req, res) => {
-  const { token } = req.body;
-  const user = await User.findById(req.user._id).select("+MFA.tempSecret +MFA.secret");
+export const enableMFA = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    const user = await User.findById(req.user._id).select("+MFA.tempSecret +MFA.secret");
 
-  if (!user) {
-    throw new AppError("User not found", 404);
-  }
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
 
-  if (!user.MFA?.tempSecret) {
-    throw new BadRequestError("MFA setup not initiated. Please start the MFA setup process first.");
-  }
+    if (!user.MFA?.tempSecret) {
+      throw new BadRequestError("MFA setup not initiated. Please start the MFA setup process first.");
+    }
 
-  if (user.MFA?.enabled) {
-    throw new BadRequestError("MFA is already enabled");
-  }
+    if (user.MFA?.enabled) {
+      throw new BadRequestError("MFA is already enabled");
+    }
 
-  const decryptedTempSecret = mfaService.decryptSecret(user.MFA.tempSecret);
-  const isVerified = mfaService.verifyToken(decryptedTempSecret, token);
+    const decryptedTempSecret = mfaService.decryptSecret(user.MFA.tempSecret);
+    const isVerified = mfaService.verifyToken(decryptedTempSecret, token);
 
-  if (isVerified) {
+    if (!isVerified) {
+      throw new UnauthorizedError("Invalid or expired MFA token");
+    }
+
+    const plainBackupCodes = mfaService.generateBackupCodes();
+    const encryptedBackupCodes = await mfaService.hashBackupCodes(plainBackupCodes);
+
     user.MFA.secret = mfaService.encryptSecret(decryptedTempSecret);
     user.MFA.tempSecret = undefined;
     user.MFA.enabled = true;
+    user.MFA.BackupCodes = encryptedBackupCodes;
     await user.save();
 
     await sendMFASetupEmail(user.email);
@@ -60,44 +72,53 @@ export const enableMFA = async (req, res) => {
 
     return sendSuccess(res, 200, "MFA enabled successfully", {
       user: { id: user._id, email: user.email, mfaEnabled: true },
+      backupCodes: plainBackupCodes, // Only return plain backup codes once at setup
     });
-  } else {
-    throw new UnauthorizedError("Invalid or expired MFA token");
+  } catch (error) {
+    next(error);
   }
 };
 
 /**
  * Disables MFA for the user. Requires a valid MFA token to confirm.
  */
-export const disableMFA = async (req, res) => {
-  const { token } = req.body;
-  const user = await User.findById(req.user._id).select("+MFA.secret +MFA.enabled");
+export const disableMFA = async (req, res, next) => {
+  try {
+    const { token, backupCode } = req.body;
+    const user = await User.findById(req.user._id).select("+MFA.secret +MFA.enabled +MFA.BackupCodes");
 
-  if (!token) {
-    throw new BadRequestError("MFA token is required to disable MFA");
+    if (!user.MFA?.enabled) {
+      throw new BadRequestError("MFA is not enabled on this account");
+    }
+
+    let isVerified = false;
+    if (token) {
+      const decryptedSecret = mfaService.decryptSecret(user.MFA.secret);
+      isVerified = mfaService.verifyToken(decryptedSecret, token, 1);
+    } else if (backupCode && user.MFA.BackupCodes?.length) {
+      isVerified = await mfaService.verifyBackupCode(backupCode, user.MFA.BackupCodes);
+    }
+
+    if (!isVerified) {
+      throw new BadRequestError("Invalid MFA token or backup code");
+    }
+
+    user.MFA.secret = undefined;
+    user.MFA.tempSecret = undefined;
+    user.MFA.enabled = false;
+    user.MFA.verifiedAt = undefined;
+    user.MFA.lastUsedAt = undefined;
+    user.MFA.BackupCodes = [];
+    await user.save();
+
+    logger.info("MFA disabled for user", { userId: user._id, email: user.email });
+
+    return sendSuccess(res, 200, "MFA disabled successfully", {
+      user: { id: user._id, email: user.email, mfaEnabled: false },
+    });
+  } catch (error) {
+    next(error);
   }
-
-  if (!user.MFA?.enabled) {
-    throw new BadRequestError("MFA is not enabled on this account");
-  }
-
-  const decryptedSecret = mfaService.decryptSecret(user.MFA.secret);
-  const isVerified = mfaService.verifyToken(decryptedSecret, token, 1);
-
-  if (!isVerified) {
-    throw new BadRequestError("Invalid MFA token");
-  }
-
-  user.MFA.secret = undefined;
-  user.MFA.tempSecret = undefined;
-  user.MFA.enabled = false;
-  await user.save();
-
-  logger.info("MFA disabled for user", { userId: user._id, email: user.email });
-
-  return sendSuccess(res, 200, "MFA disabled successfully", {
-    user: { id: user._id, email: user.email, mfaEnabled: false },
-  });
 };
 
 /**
@@ -105,62 +126,74 @@ export const disableMFA = async (req, res) => {
  * If successful, promotes tempSecret to secret and enables MFA.
  */
 
-export const verifyMFA = async (req, res) => {
-  const { mfaToken, token } = req.body;
-
-  if (!mfaToken) {
-    throw new BadRequestError("MFA setup token is required");
-  }
-  if (!token) {
-    throw new BadRequestError("MFA token is required");
-  }
-
-  if (typeof token !== "string" || !/^\d{6}$/.test(token)) {
-    throw new BadRequestError("TOTP token must be a 6-digit numeric string");
-  }
-
-  let payload;
+export const verifyMFA = async (req, res, next) => {
   try {
-    payload = verifyMfaToken(mfaToken);
-  } catch (error) {
-    throw new UnauthorizedError("Invalid or expired MFA session token");
-  }
+    const { mfaToken, token, backupCode } = req.body;
 
-  if (payload.purpose !== "mfa_verification") {
-    throw new UnauthorizedError("Invalid MFA session token purpose");
-  }
+    if (!mfaToken) {
+      throw new BadRequestError("MFA setup token is required");
+    }
+    if (!token && !backupCode) {
+      throw new BadRequestError("MFA token or backup code is required");
+    }
 
-  const user = await userModel.findById(payload.userId).select("+MFA.secret +MFA.enabled");
+    if (typeof token !== "string" || !/^\d{6}$/.test(token)) {
+      throw new BadRequestError("TOTP token must be a 6-digit numeric string");
+    }
 
-  if (!user) {
-    throw new UnauthorizedError("User not found");
-  }
+    let payload;
+    try {
+      payload = verifyMfaToken(mfaToken);
+    } catch (error) {
+      throw new UnauthorizedError("Invalid or expired MFA session token");
+    }
 
-  if (!user.MFA?.enabled) {
-    throw new BadRequestError("MFA is not enabled for this account");
-  }
+    if (payload.purpose !== "mfa_verification") {
+      throw new UnauthorizedError("Invalid MFA session token purpose");
+    }
 
-  if (!user.MFA?.tempSecret) {
-    throw new BadRequestError("MFA is not configured for this account");
-  }
+    const user = await userModel.findById(payload.userId).select("+MFA.secret +MFA.enabled +MFA.BackupCodes");
 
-  const decryptedTempSecret = mfaService.decryptSecret(user.MFA.tempSecret);
-  const isVerified = mfaService.verifyToken(decryptedTempSecret, token, 3);
+    if (!user) {
+      throw new UnauthorizedError("User not found");
+    }
 
-  if (isVerified) {
-    const accessToken = generateAccessToken(user);
+    if (!user.MFA?.enabled) {
+      throw new BadRequestError("MFA is not enabled for this account");
+    }
+
+    let isVerified = false;
+    if (token) {
+      const decryptedSecret = mfaService.decryptSecret(user.MFA.secret);
+      isVerified = mfaService.verifyToken(decryptedSecret, token, 3);
+    } else if (backupCode) {
+      isVerified = await mfaService.verifyBackupCode(backupCode, user.MFA.BackupCodes);
+      if (isVerified) {
+        const updated = await mfaService.removeUsedBackupCode(backupCode, user.MFA.BackupCodes);
+        await user.save();
+        logger.info("MFA backup code used for MFA", { userId: user._id, email: user.email });
+      }
+    }
+
+    if (!isVerified) {
+      throw new BadRequestError("Invalid or expired MFA token/backup code");
+    }
+
+    user.MFA.lastUsedAt = new Date();
+    await user.save();
+
+    const accessToken = generateAccessToken(user, true);
     const refreshToken = generateRefreshToken(user);
     await addRefreshToken(user._id, refreshToken);
     setRefreshTokenCookie(res, refreshToken);
-    await user.save();
 
     logger.info("MFA verified, user logged in", { userId: user._id, email: user.email });
 
     return sendSuccess(res, 200, "MFA verified successfully", {
       user: { id: user._id, accessToken, email: user.email },
     });
-  } else {
-    return next(new BadRequestError("Invalid or expired MFA token"));
+  } catch (error) {
+    next(error);
   }
 };
 

@@ -1,5 +1,6 @@
 import speakeasy from "speakeasy";
 import qrcode from "qrcode";
+import bcrypt from "bcrypt";
 import logger from "../../config/winston.logger.js";
 import { encryptData, decryptData } from "../../utils/crypto.js";
 
@@ -44,6 +45,65 @@ export const verifyToken = (secret, token, window = 1) => {
     token: String(token),
     window,
   });
+};
+
+/**
+ * Generate backup codes (plain text) for MFA recovery.
+ * @param {number} count - Jumlah kode (default 8)
+ * @param {number} length - Panjang tiap kode (default 8)
+ * @returns {string[]} Array kode backup plain
+ */
+export const generateBackupCodes = (count = 8, length = 8) => {
+  const codes = [];
+  for (let i = 0; i < count; i++) {
+    const code = crypto
+      .randomBytes(Math.ceil(length / 2))
+      .toString("hex")
+      .slice(0, length)
+      .toUpperCase();
+    codes.push(code);
+  }
+  return codes;
+};
+
+/**
+ * Hash backup codes (bcrypt) untuk disimpan di DB.
+ * @param {string[]} plainCodes
+ * @returns {Promise<string[]>}
+ */
+export const hashBackupCodes = async (plainCodes) => {
+  const saltRounds = 10;
+  return await Promise.all(plainCodes.map((code) => bcrypt.hash(code, saltRounds)));
+};
+
+/**
+ * Verifikasi apakah backup code cocok dengan salah satu hash yang tersimpan.
+ * @param {string} inputCode - Kode dari user
+ * @param {string[]} hashedCodes - Array hash dari DB
+ * @returns {Promise<boolean>}
+ */
+export const verifyBackupCode = async (inputCode, hashedCodes) => {
+  for (const hash of hashedCodes) {
+    if (await bcrypt.compare(inputCode, hash)) return true;
+  }
+  return false;
+};
+
+/**
+ * Hapus backup code yang sudah digunakan (return array baru tanpa hash tsb).
+ * @param {string} inputCode - Kode yang digunakan
+ * @param {string[]} hashedCodes - Array hash saat ini
+ * @returns {Promise<string[]>}
+ */
+export const removeUsedBackupCode = async (inputCode, hashedCodes) => {
+  for (let i = 0; i < hashedCodes.length; i++) {
+    if (await bcrypt.compare(inputCode, hashedCodes[i])) {
+      const newCodes = [...hashedCodes];
+      newCodes.splice(i, 1);
+      return newCodes;
+    }
+  }
+  return hashedCodes;
 };
 
 /**

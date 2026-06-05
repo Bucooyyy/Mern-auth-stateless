@@ -67,6 +67,9 @@ const userSchema = new mongoose.Schema(
       secret: { type: String, select: false }, //Secret permanen setelah terverifikasi
       tempSecret: { type: String, select: false }, // Secret sementara saat proses setup
       enabled: { type: Boolean, default: false },
+      verifiedAt: { type: Date, select: false },
+      lastUsedAt: { type: Date, select: false },
+      BackupCodes: { type: [String], select: false, default: [] },
     },
     oauth: {
       googleId: { type: String, default: null },
