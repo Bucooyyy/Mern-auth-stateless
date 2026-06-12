@@ -1,8 +1,8 @@
 import User from "../models/user.model.js";
-import * as mfaService from "../lib/mfa/mfa.service.js";
+import * as mfaService from "../utils/mfa.service.js";
 import { generateAccessToken, generateRefreshToken, verifyMfaToken, setRefreshTokenCookie } from "../utils/tokenjwt.js";
-import { addRefreshToken } from "../lib/token-services/refreshToken.service.js";
-import { sendMFASetupEmail } from "../lib/email/mailsender.js";
+import { addRefreshToken } from "../utils/refreshToken.service.js";
+import { sendMFASetupEmail } from "../utils/mailsender.js";
 import { AppError, BadRequestError, InternalServerError, UnauthorizedError } from "../errors/error.js";
 import { sendSuccess } from "../utils/response.js";
 import logger from "../config/winston.logger.js";

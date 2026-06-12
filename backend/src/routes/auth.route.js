@@ -13,7 +13,7 @@ import {
   oauthSuccess,
 } from "../controllers/authController.js";
 
-import { sanitizeMiddleware, fieldSanitizeMiddleware } from "../middleware/sanitize.js";
+import { sanitizeFields, detectSuspiciousPayload } from "../middleware/sanitize.middleware.js";
 import requireAuth from "../middleware/requireAuth.js";
 
 import { blacklistToken } from "../utils/tokenjwt.js";
@@ -22,7 +22,7 @@ import { authLimiter, sensitiveLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
-router.use(sanitizeMiddleware());
+router.use(detectSuspiciousPayload());
 
 // Registration Route
 router.post("/register", register);

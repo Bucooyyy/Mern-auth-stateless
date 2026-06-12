@@ -1,5 +1,5 @@
-import getTransporter from "../../config/nodemailer.config.js";
-import logger from "../../config/winston.logger.js";
+import getTransporter from "../config/nodemailer.config.js";
+import logger from "../config/winston.logger.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 

@@ -1,5 +1,5 @@
-import { AppError } from "../../errors/error.js";
-import logger from "../../config/winston.logger.js";
+import { AppError } from "../errors/error.js";
+import logger from "../config/winston.logger.js";
 
 /**
  * Central Express error handler.

@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import morgan from "morgan";
-import passport from "./lib/passport-strategies/passport.js";
+import passport from "./config/passport.js";
 import authRoutes from "./routes/auth.route.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.config.js";
@@ -13,6 +13,7 @@ import { swaggerSpec } from "./config/swagger.config.js";
 import { connectDB } from "./config/db.config.js";
 import { getRedisClient } from "./config/redis.config.js";
 import { generalLimiter } from "./middleware/rateLimiter.js";
+import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
 
@@ -35,6 +36,8 @@ app.use("/api/auth", authRoutes);
 const port = process.env.PORT || 5000;
 connectDB();
 getRedisClient();
+
+app.use(errorHandler);
 try {
   app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

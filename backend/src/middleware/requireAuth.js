@@ -1,6 +1,6 @@
 import passport from "passport";
-import logger, { logSecurityEvent } from "../config/winston.logger";
-import { UnauthorizedError } from "../errors/error";
+import logger, { logSecurityEvent } from "../config/winston.logger.js";
+import { UnauthorizedError } from "../errors/error.js";
 
 const requireAuth = (req, res, next) => {
   if (process.env.NODE_ENV !== "production") {

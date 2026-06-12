@@ -1,24 +1,28 @@
 import userModel from "../models/user.model.js";
 import { hashPassword, comparePassword } from "../utils/crypto.js";
-import { generateAccessToken, generateRefreshToken, generateMfaToken, verifyMfaToken, blacklistToken, isTokenBlacklisted, setRefreshTokenCookie, clearRefreshTokenCookie, verifyRefreshToken } from "../utils/tokenjwt.js";
-import { logSecurityEvent } from "../config/winston.logger.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generateMfaToken,
+  verifyMfaToken,
+  blacklistToken,
+  isTokenBlacklisted,
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+  verifyRefreshToken,
+} from "../utils/tokenjwt.js";
+import logger, { logSecurityEvent } from "../config/winston.logger.js";
 import jwt from "jsonwebtoken";
 import speakeasy from "speakeasy";
 import crypto from "crypto";
-import { sendEmailVerifyPasswordReset } from "../lib/email/mailsender.js";
-import nodemailer from "nodemailer";
+import { sendEmailVerifyPasswordReset } from "../utils/mailsender.js";
+import getTransporter from "../config/nodemailer.config.js";
+import * as emailLogic from "../utils/mailsender.js";
 
 import { AppError, BadRequestError, InternalServerError, UnauthorizedError } from "../errors/error.js";
 import { sendSuccess } from "../utils/response.js";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+
 
 /**
  * Register a new user.
@@ -58,7 +62,7 @@ export const register = async (req, res, next) => {
     });
 
     await user.save();
-    console.log("User registered successfully:", user);
+    logger.info("User registered successfully:", { userId: user._id });
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -66,23 +70,11 @@ export const register = async (req, res, next) => {
 
     user.refreshTokens.push(refreshToken);
     await user.save();
-    
-    try {
-      // Create verification link
-      const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawVerificationToken}`;
-      const mailOptions = {
-        from: `"Auth App" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        subject: "Verify your Email",
-        html: `<p>Please verify your email by clicking the following link:</p> <a href="${verifyLink}">${verifyLink}</a> <p>This link expires in 10 minutes.</p>`,
-      };
-      await transporter.sendMail(mailOptions);
-    } catch (err) {
-      console.error("Failed to send verification email:", err);
-    }
-    
+
+    await emailLogic.sendVerificationEmail(user.email, rawVerificationToken);
+
     logSecurityEvent("REGISTRATION_SUCCESS", user._id, req.ip, req.get("User-Agent"));
-    
+
     return sendSuccess(res, 201, "User registered successfully", {
       accessToken,
       user: {
@@ -97,7 +89,7 @@ export const register = async (req, res, next) => {
     logSecurityEvent("REGISTRATION_ERROR", null, req.ip, req.get("User-Agent"), {
       error: error.message,
     });
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -115,7 +107,9 @@ export const login = async (req, res, next) => {
   }
 
   try {
-    const user = await userModel.findOne({ email }).select("+password +MFA.enabled +MFA.secret +failedLoginAttempts +lockUntil +refreshTokens +roles");
+    const user = await userModel
+      .findOne({ email })
+      .select("+password +MFA.enabled +MFA.secret +failedLoginAttempts +lockUntil +refreshTokens +roles");
 
     if (!user) {
       logSecurityEvent("LOGIN_FAILED", null, req.ip, req.get("User-Agent"), {
@@ -159,7 +153,7 @@ export const login = async (req, res, next) => {
 
     user.refreshTokens.push(refreshToken);
     await user.save();
-    
+
     return sendSuccess(res, 200, "Logged in successfully", {
       accessToken,
       user: {
@@ -167,10 +161,10 @@ export const login = async (req, res, next) => {
         email: user.email,
         name: user.name,
         role: user.roles,
-      }
+      },
     });
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -192,13 +186,13 @@ export const verifyMfaLogin = async (req, res, next) => {
 
   try {
     const decoded = verifyMfaToken(tempToken);
-    
+
     if (decoded.purpose !== "mfa_verification") {
       return next(new BadRequestError("Invalid token type"));
     }
 
     const user = await userModel.findById(decoded.userId).select("+MFA.secret +MFA.enabled +refreshTokens +roles");
-    
+
     if (!user || !user.MFA || !user.MFA.enabled) {
       return next(new BadRequestError("MFA is not enabled for this user"));
     }
@@ -210,7 +204,7 @@ export const verifyMfaLogin = async (req, res, next) => {
       secret: decryptedSecret,
       encoding: "base32",
       token: otp,
-      window: 1
+      window: 1,
     });
 
     if (!isOtpValid) {
@@ -227,15 +221,15 @@ export const verifyMfaLogin = async (req, res, next) => {
 
     user.refreshTokens.push(refreshToken);
     await user.save();
-    
+
     return sendSuccess(res, 200, "MFA verified, logged in successfully", {
       accessToken,
       user: {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.roles
-      }
+        role: user.roles,
+      },
     });
   } catch (error) {
     next(new UnauthorizedError("Invalid or expired temporary token"));
@@ -256,7 +250,7 @@ export const authStatus = (req, res, next) => {
 
     return sendSuccess(res, 200, "User is authenticated", { user: req.user });
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -286,7 +280,7 @@ export const logout = async (req, res, next) => {
     if (req.user) {
       const user = await userModel.findById(req.user._id).select("+refreshTokens");
       if (user && refreshToken) {
-        user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
+        user.refreshTokens = user.refreshTokens.filter((t) => t !== refreshToken);
         await user.save();
       }
     }
@@ -294,7 +288,7 @@ export const logout = async (req, res, next) => {
     clearRefreshTokenCookie(res);
     return sendSuccess(res, 200, "Logged out successfully");
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -322,20 +316,11 @@ export const sendVerificationEmail = async (req, res, next) => {
     user.emailVerificationTokenExpires = Date.now() + 10 * 60 * 1000; // 10 mins
     await user.save();
 
-    const verifyLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${rawVerificationToken}`;
-    
-    const mailOptions = {
-      from: `"Auth App" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: "Verify your Email",
-      html: `<p>Please verify your email by clicking the following link:</p> <a href="${verifyLink}">${verifyLink}</a> <p>This link expires in 10 minutes.</p>`,
-    };
-
-    await transporter.sendMail(mailOptions);
+    await emailLogic.sendVerificationEmail(user.email, rawVerificationToken);
 
     return sendSuccess(res, 200, "Verification email sent successfully");
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -351,10 +336,10 @@ export const confirmEmailVerification = async (req, res, next) => {
     if (!token) return next(new BadRequestError("Token is required"));
 
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    
+
     const user = await userModel.findOne({
       emailVerificationToken: hashedToken,
-      emailVerificationTokenExpires: { $gt: Date.now() }
+      emailVerificationTokenExpires: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -368,7 +353,7 @@ export const confirmEmailVerification = async (req, res, next) => {
 
     return sendSuccess(res, 200, "Email verified successfully");
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -397,12 +382,12 @@ export const requestPasswordReset = async (req, res, next) => {
     try {
       await sendEmailVerifyPasswordReset(user.email, resetToken);
     } catch (err) {
-      console.error("Failed to send reset email:", err);
+      logger.error("Failed to send reset email:", { error: err.message, stack: err.stack });
     }
 
     return sendSuccess(res, 200, "If an account with that email exists, we sent a password reset link.");
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -415,7 +400,7 @@ export const requestPasswordReset = async (req, res, next) => {
 export const confirmPasswordReset = async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
-    
+
     if (!token || !newPassword) {
       return next(new BadRequestError("Token and new password are required"));
     }
@@ -425,10 +410,10 @@ export const confirmPasswordReset = async (req, res, next) => {
     }
 
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    
+
     const user = await userModel.findOne({
       resetPasswordToken: hashedToken,
-      resetPasswordTokenExpires: { $gt: Date.now() }
+      resetPasswordTokenExpires: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -441,12 +426,12 @@ export const confirmPasswordReset = async (req, res, next) => {
     user.refreshTokens = [];
     user.lockUntil = undefined;
     user.failedLoginAttempts = 0;
-    
+
     await user.save();
 
     return sendSuccess(res, 200, "Password has been reset successfully");
   } catch (error) {
-    next(new InternalServerError(error.message));
+    next(error);
   }
 };
 
@@ -473,7 +458,7 @@ export const rotateTokens = async (req, res, next) => {
     }
 
     const newAccessToken = generateAccessToken(user);
-    
+
     return sendSuccess(res, 200, "Tokens refreshed successfully", {
       accessToken: newAccessToken,
       user: {
@@ -492,12 +477,12 @@ export const oauthSuccess = (req, res) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth?error=OAuthFailed`);
+      return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?error=OAuthFailed`);
     }
 
     if (user.MFA && user.MFA.enabled) {
       const tempToken = generateMfaToken(user);
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth?mfaRequired=true&token=${tempToken}`);
+      return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?mfaRequired=true&token=${tempToken}`);
     }
 
     const accessToken = generateAccessToken(user);
@@ -508,9 +493,9 @@ export const oauthSuccess = (req, res) => {
     user.save().then(() => {
       // Typically you'd pass accessToken to frontend via URL fragment or specialized redirect.
       // E.g. res.redirect(`${process.env.FRONTEND_URL}/auth-success?token=${accessToken}`);
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard?token=${accessToken}`);
+      res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/dashboard?token=${accessToken}`);
     });
   } catch (error) {
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth?error=InternalServerError`);
+    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?error=InternalServerError`);
   }
 };

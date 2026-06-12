@@ -8,9 +8,9 @@ import { Strategy as GithubStrategy } from "passport-github2";
 import { Strategy as TwitterStrategy } from "passport-twitter";
 
 import bcrypt from "bcrypt";
-import User from "../../models/user.model.js";
-import logger, { logSecurityEvent } from "../../config/winston.logger.js";
-import { isTokenBlacklisted } from "../../utils/tokenjwt.js";
+import User from "../models/user.model.js";
+import logger, { logSecurityEvent } from "../config/winston.logger.js";
+import { isTokenBlacklisted } from "../utils/tokenjwt.js";
 
 // ─── Helper: find-or-create an OAuth user ─────────────────────────────────────
 /**
