@@ -7,6 +7,8 @@ import {
   verifyMfaToken,
   blacklistToken,
   isTokenBlacklisted,
+  setAccessTokenCookie,
+  clearAccessTokenCookie,
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
   verifyRefreshToken,
@@ -16,13 +18,10 @@ import jwt from "jsonwebtoken";
 import speakeasy from "speakeasy";
 import crypto from "crypto";
 import { sendEmailVerifyPasswordReset } from "../utils/mailsender.js";
-import getTransporter from "../config/nodemailer.config.js";
 import * as emailLogic from "../utils/mailsender.js";
 
 import { AppError, BadRequestError, InternalServerError, UnauthorizedError } from "../errors/error.js";
 import { sendSuccess } from "../utils/response.js";
-
-
 
 /**
  * Register a new user.
@@ -66,6 +65,7 @@ export const register = async (req, res, next) => {
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    setAccessTokenCookie(res, accessToken);
     setRefreshTokenCookie(res, refreshToken);
 
     user.refreshTokens.push(refreshToken);
@@ -149,6 +149,7 @@ export const login = async (req, res, next) => {
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    setAccessTokenCookie(res, accessToken);
     setRefreshTokenCookie(res, refreshToken);
 
     user.refreshTokens.push(refreshToken);
@@ -217,6 +218,7 @@ export const verifyMfaLogin = async (req, res, next) => {
     });
 
     const refreshToken = generateRefreshToken(user);
+    setAccessTokenCookie(res, accessToken);
     setRefreshTokenCookie(res, refreshToken);
 
     user.refreshTokens.push(refreshToken);
@@ -267,6 +269,8 @@ export const logout = async (req, res, next) => {
     let accessToken = null;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       accessToken = authHeader.split(" ")[1];
+    } else if (req.cookies && req.cookies.accessToken) {
+      accessToken = req.cookies.accessToken;
     }
     const refreshToken = req.cookies.refreshToken;
 
@@ -285,6 +289,7 @@ export const logout = async (req, res, next) => {
       }
     }
 
+    clearAccessTokenCookie(res);
     clearRefreshTokenCookie(res);
     return sendSuccess(res, 200, "Logged out successfully");
   } catch (error) {
@@ -458,6 +463,7 @@ export const rotateTokens = async (req, res, next) => {
     }
 
     const newAccessToken = generateAccessToken(user);
+    setAccessTokenCookie(res, newAccessToken);
 
     return sendSuccess(res, 200, "Tokens refreshed successfully", {
       accessToken: newAccessToken,
@@ -487,6 +493,7 @@ export const oauthSuccess = (req, res) => {
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    setAccessTokenCookie(res, accessToken);
     setRefreshTokenCookie(res, refreshToken);
 
     user.refreshTokens.push(refreshToken);

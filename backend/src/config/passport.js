@@ -64,24 +64,42 @@ const handleOAuthUser = async ({ provider, providerId, email, name, avatar, reqI
 };
 
 // ─── JWT Strategy ───────────────────────────────────────────────────────────────
+/**
+ * Configures the JWT strategy for Passport.
+ * It extracts the token from either the Authorization header or the accessToken cookie.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {object} payload - The decoded JWT payload.
+ * @param {function} done - The callback function to resolve the authentication.
+ */
 passport.use(
   "jwt",
   new JwtStrategy(
     {
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req) => req?.cookies?.accessToken || null,
+      ]),
       secretOrKey: process.env.JWT_ACCESS_SECRET,
       passReqToCallback: true,
     },
     async (req, payload, done) => {
       try {
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        let token = null;
+
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+          token = authHeader.split(" ")[1];
+        } else if (req.cookies && req.cookies.accessToken) {
+          token = req.cookies.accessToken;
+        }
+
+        if (!token) {
           logSecurityEvent("MISSING_TOKEN", null, req.ip, req.headers["user-agent"], {
             path: req.originalUrl,
+            reason: "No auth token in header or cookie",
           });
-          return done(null, false);
+          return done(null, false, { message: "No auth token" });
         }
-        const token = authHeader.split(" ")[1];
 
         const isBlackListed = await isTokenBlacklisted(token);
         if (isBlackListed) {

@@ -26,6 +26,40 @@ export const generateRefreshToken = (user) =>
 export const verifyRefreshToken = (token) => jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 
 // ─── Cookie helper ────────────────────────────────────────────────────────────
+/** Milliseconds represented by the access expiry env var (default 15m). */
+const ACCESS_MS = (() => {
+  const raw = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+  const match = raw.match(/^(\d+)([smhd])$/);
+  if (!match) return 15 * 60 * 1000;
+  const [, n, unit] = match;
+  const multipliers = { s: 1e3, m: 60e3, h: 3600e3, d: 86400e3 };
+  return Number(n) * multipliers[unit];
+})();
+
+/**
+ * Set the access token as a secure HTTP-only cookie on the response.
+ * This cookie is used to securely store the short-lived access token.
+ * @param {import('express').Response} res - The Express response object.
+ * @param {string} accessToken - The generated access token to be stored.
+ */
+export const setAccessTokenCookie = (res, accessToken) => {
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+    maxAge: ACCESS_MS,
+    path: "/",
+  });
+};
+
+/**
+ * Clear the access token cookie from the client's browser.
+ * This is primarily used during the logout process.
+ * @param {import('express').Response} res - The Express response object.
+ */
+export const clearAccessTokenCookie = (res) => {
+  res.clearCookie("accessToken", { path: "/" });
+};
 /** Milliseconds represented by the refresh expiry env var (default 7d). */
 const REFRESH_MS = (() => {
   const raw = process.env.JWT_REFRESH_EXPIRES_IN || "7d";

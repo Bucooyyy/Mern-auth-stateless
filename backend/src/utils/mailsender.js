@@ -6,7 +6,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const send = async (to, subject, html) => {
   try {
     const transport = await getTransporter();
-    const info = await transport.sendMail({ from: process.env.EMAIL_USER, to, subject, html });
+    const info = await transport.sendMail({ from: process.env.SENDER_EMAIL || process.env.SMTP_USER, to, subject, html });
     logger.info("Email sent", { to, subject, messageId: info.messageId });
     return info;
   } catch (err) {
