@@ -5,7 +5,6 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as DiscordStrategy } from "passport-discord";
 import { Strategy as GithubStrategy } from "passport-github2";
-import { Strategy as TwitterStrategy } from "passport-twitter";
 
 import bcrypt from "bcrypt";
 import User from "../models/user.model.js";
@@ -75,10 +74,7 @@ passport.use(
   "jwt",
   new JwtStrategy(
     {
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-        (req) => req?.cookies?.accessToken || null,
-      ]),
+      jwtFromRequest: ExtractJwt.fromExtractors([ExtractJwt.fromAuthHeaderAsBearerToken(), (req) => req?.cookies?.accessToken || null]),
       secretOrKey: process.env.JWT_ACCESS_SECRET,
       passReqToCallback: true,
     },
@@ -263,41 +259,6 @@ passport.use(
         return done(null, user);
       } catch (error) {
         logger.error("ERROR_IN_DISCORD_STRATEGY", {
-          error: error.message,
-          stack: error.stack,
-          profileId: profile?.id,
-        });
-        return done(error);
-      }
-    },
-  ),
-);
-
-// ─── Twitter Strategy ──────────────────────────────────────────────────────────
-passport.use(
-  new TwitterStrategy(
-    {
-      consumerKey: process.env.TWITTER_CONSUMER_KEY,
-      consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
-      callbackURL: process.env.TWITTER_CALLBACK_URL,
-      includeEmail: true,
-      passReqToCallback: true,
-    },
-    async (req, _token, _tokenSecret, profile, done) => {
-      try {
-        const email = profile.emails?.[0]?.value;
-        const user = await handleOAuthUser({
-          provider: "twitter",
-          providerId: profile.id,
-          email,
-          name: profile.displayName,
-          avatar: profile.photos?.[0]?.value?.replace("_normal", ""),
-          reqIp: req.ip,
-          userAgent: req.headers["user-agent"],
-        });
-        return done(null, user);
-      } catch (error) {
-        logger.error("ERROR_IN_TWITTER_STRATEGY", {
           error: error.message,
           stack: error.stack,
           profileId: profile?.id,
