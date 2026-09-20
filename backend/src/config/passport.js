@@ -233,40 +233,4 @@ passport.use(
   ),
 );
 
-// ─── Discord Strategy ──────────────────────────────────────────────────────────
-passport.use(
-  new DiscordStrategy(
-    {
-      clientID: process.env.DISCORD_CLIENT_ID,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET,
-      callbackURL: process.env.DISCORD_CALLBACK_URL,
-      scope: ["identify", "email"],
-      passReqToCallback: true,
-    },
-    async (req, _accessToken, _refreshToken, profile, done) => {
-      try {
-        const email = profile.email;
-        const avatar = profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : null;
-        const user = await handleOAuthUser({
-          provider: "discord",
-          providerId: profile.id,
-          email,
-          name: profile.username,
-          avatar,
-          reqIp: req.ip,
-          userAgent: req.headers["user-agent"],
-        });
-        return done(null, user);
-      } catch (error) {
-        logger.error("ERROR_IN_DISCORD_STRATEGY", {
-          error: error.message,
-          stack: error.stack,
-          profileId: profile?.id,
-        });
-        return done(error);
-      }
-    },
-  ),
-);
-
 export default passport;

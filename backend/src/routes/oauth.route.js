@@ -15,18 +15,6 @@ router.get(
   oauthSuccess,
 );
 
-// ─── Discord ──────────────────────────────────────────────────────────────────
-router.get("/discord", passport.authenticate("discord", { session: false }));
-
-router.get(
-  "/discord/callback",
-  passport.authenticate("discord", {
-    session: false,
-    failureRedirect: `${process.env.CLIENT_URL}/login?error=discord_failed`,
-  }),
-  oauthSuccess,
-);
-
 // ─── GitHub ───────────────────────────────────────────────────────────────────
 router.get("/github", passport.authenticate("github", { session: false, scope: ["user:email"] }));
 
