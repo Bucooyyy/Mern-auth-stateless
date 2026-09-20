@@ -39,17 +39,4 @@ router.get(
   oauthSuccess,
 );
 
-// ─── Twitter ──────────────────────────────────────────────────────────────────
-// Note: Twitter OAuth 1.0a requires a request-token step (no session: false for initiation)
-router.get("/twitter", passport.authenticate("twitter"));
-
-router.get(
-  "/twitter/callback",
-  passport.authenticate("twitter", {
-    session: false,
-    failureRedirect: `${process.env.CLIENT_URL}/login?error=twitter_failed`,
-  }),
-  oauthSuccess,
-);
-
 export default router;
