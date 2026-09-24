@@ -46,12 +46,24 @@ function sanitizeValue(value, depth = 0, key = "") {
   return value;
 }
 
+/**
+ * Replace every key of `target` with its sanitized value, in place.
+ * Express 5 makes `req.query` a getter-only accessor, so `req.query = ...`
+ * throws ("Cannot set property query of #<IncomingMessage> which has only
+ * a getter"). Mutating the existing object works for query/params/body alike.
+ */
+function sanitizeInPlace(target) {
+  for (const [key, value] of Object.entries(target)) {
+    target[key] = sanitizeValue(value, 0, key);
+  }
+}
+
 export const sanitizeAll = () => {
   return (req, res, next) => {
     try {
-      if (req.body) req.body = sanitizeValue(req.body);
-      if (req.query) req.query = sanitizeValue(req.query);
-      if (req.params) req.params = sanitizeValue(req.params);
+      if (req.body) sanitizeInPlace(req.body);
+      if (req.query) sanitizeInPlace(req.query);
+      if (req.params) sanitizeInPlace(req.params);
       next();
     } catch (error) {
       next(error);

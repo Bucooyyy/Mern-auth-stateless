@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOG_DIR = path.join(__dirname, "../../logs");
 
-const SENSITIVE_KEYS = ["password", "secret", "token", "refreshToken", "accessToken", "authorization", "pin"];
+const SENSITIVE_KEYS = new Set(["password", "secret", "token", "refreshToken", "accessToken", "authorization", "pin"]);
 
 const maskSensitive = winston.format((info) => {
   if (info.meta && typeof info.meta === "object") {

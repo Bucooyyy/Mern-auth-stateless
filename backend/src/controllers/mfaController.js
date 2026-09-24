@@ -152,7 +152,7 @@ export const verifyMFA = async (req, res, next) => {
       throw new UnauthorizedError("Invalid MFA session token purpose");
     }
 
-    const user = await userModel.findById(payload.userId).select("+MFA.secret +MFA.enabled +MFA.BackupCodes");
+    const user = await User.findById(payload.userId).select("+MFA.secret +MFA.enabled +MFA.BackupCodes");
 
     if (!user) {
       throw new UnauthorizedError("User not found");

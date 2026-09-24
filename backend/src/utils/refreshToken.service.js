@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import User from "../models/User.js";
-import logger from "../../config/winston.logger.js";
+import User from "../models/user.model.js";
+import logger from "../config/winston.logger.js";
 
 // ─── Token utilities ──────────────────────────────────────────────────────────
 /** Generate a cryptographically random hex token and its SHA-256 hash. */

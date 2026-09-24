@@ -9,10 +9,14 @@ const redis = () => getRedisClient(); // lazy accessor
  * Generate a short-lived access token.
  * Payload: { userId, role }
  */
-export const generateAccessToken = (user) =>
-  jwt.sign({ userId: user._id.toString(), role: user.role }, process.env.JWT_ACCESS_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
-  });
+export const generateAccessToken = (user, mfaVerified = false) =>
+  jwt.sign(
+    { userId: user._id.toString(), role: user.roles, ...(mfaVerified ? { mfaVerified: true } : {}) },
+    process.env.JWT_ACCESS_SECRET,
+    {
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+    },
+  );
 
 // ─── Refresh Token ────────────────────────────────────────────────────────────
 /**

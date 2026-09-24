@@ -1,5 +1,5 @@
-import logger, { logSecurityEvent } from "../config/winston.logger";
-import { UnauthorizedError, ForbiddenError } from "../errors/error";
+import logger, { logSecurityEvent } from "../config/winston.logger.js";
+import { UnauthorizedError, ForbiddenError } from "../errors/error.js";
 
 const checkRole = (...allowedRoles) => {
   return (req, res, next) => {
@@ -11,7 +11,7 @@ const checkRole = (...allowedRoles) => {
       }
 
       const userRoles = req.user.roles;
-      const hasRole = Array.isArray(userRoles) ? userRoles.some((role) => allowedRoles.includes(role)) : allowedRoles.includes(userRole);
+      const hasRole = Array.isArray(userRoles) ? userRoles.some((role) => allowedRoles.includes(role)) : allowedRoles.includes(userRoles);
 
       if (!hasRole) {
         logger.warn("Forbidden access attempt due to insufficient role.");

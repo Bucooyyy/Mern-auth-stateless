@@ -1,8 +1,9 @@
 import speakeasy from "speakeasy";
 import qrcode from "qrcode";
 import bcrypt from "bcrypt";
-import logger from "../../config/winston.logger.js";
-import { encryptData, decryptData } from "../../utils/crypto.js";
+import crypto from "crypto";
+import logger from "../config/winston.logger.js";
+import { encryptData, decryptData } from "./crypto.js";
 
 /**
  * Generates an MFA secret for the user.

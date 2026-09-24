@@ -1,6 +1,6 @@
 import { body, param } from "express-validator";
 import { validationResult } from "express-validator";
-import { BadRequestError } from "../utils/errors.js";
+import { BadRequestError } from "../errors/error.js";
 
 // ─── Error-checking middleware ────────────────────────────────────────────────
 /**
@@ -93,5 +93,5 @@ export const validateRoleChange = [
 export const validateProfileUpdate = [
   body("name").optional().trim().isLength({ min: 2, max: 50 }).withMessage("Name must be 2–50 characters"),
 
-  body("avatar").optional().isURL().withMessage("Avatar must be a valid URL"),
+  body("email").optional().trim().isEmail().withMessage("Invalid email format").normalizeEmail(),
 ];

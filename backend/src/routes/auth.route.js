@@ -1,5 +1,4 @@
 import { Router } from "express";
-import jwt from "jsonwebtoken";
 import {
   register,
   login,
@@ -10,24 +9,22 @@ import {
   confirmEmailVerification,
   requestPasswordReset,
   confirmPasswordReset,
-  oauthSuccess,
 } from "../controllers/authController.js";
 
-import { sanitizeFields, detectSuspiciousPayload } from "../middleware/sanitize.middleware.js";
+import { detectSuspiciousPayload } from "../middleware/sanitize.middleware.js";
 import requireAuth from "../middleware/requireAuth.js";
 
-import { blacklistToken } from "../utils/tokenjwt.js";
-
-import { authLimiter, sensitiveLimiter } from "../middleware/rateLimiter.js";
+import { authLimiter, sensitiveLimiter, registerLimiter } from "../middleware/rateLimiter.js";
+import { validateRegister, validateLogin, validateForgotPassword, validateResetPassword, checkValidation } from "../validators/auth.validator.js";
 
 const router = Router();
 
 router.use(detectSuspiciousPayload());
 
 // Registration Route
-router.post("/register", register);
+router.post("/register", registerLimiter, validateRegister, checkValidation, register);
 // Login Route
-router.post("/login", authLimiter, login);
+router.post("/login", authLimiter, validateLogin, checkValidation, login);
 // Login MFA Verify Route
 router.post("/verify-mfa", authLimiter, verifyMfaLogin);
 // Logout Route
@@ -37,67 +34,15 @@ router.post("/logout", logout);
 router.post("/verify-email", sensitiveLimiter, confirmEmailVerification);
 
 // Password Reset
-router.post("/forgot-password", sensitiveLimiter, requestPasswordReset);
-router.post("/reset-password", sensitiveLimiter, confirmPasswordReset);
+router.post("/forgot-password", sensitiveLimiter, validateForgotPassword, checkValidation, requestPasswordReset);
+router.post("/reset-password", sensitiveLimiter, validateResetPassword, checkValidation, confirmPasswordReset);
 
 // Auth Status Route
 router.get("/profil", requireAuth, authStatus);
 
-// Tambahkan di routes untuk debugging
-router.get("/debug-cookies", (req, res) => {
-  console.log("=== DEBUG COOKIES ===");
-  console.log("All cookies:", req.cookies);
-
-  // Test access token
-  if (req.cookies.accessToken) {
-    try {
-      res.json({
-        success: true,
-        accessToken: decoded,
-        cookieFound: true,
-      });
-    } catch (error) {
-      console.log("Access token invalid:", error.message);
-      res.json({
-        success: false,
-        error: error.message,
-        cookieFound: true,
-      });
-    }
-  } else {
-    console.log("No access token cookie found");
-    res.json({
-      success: false,
-      error: "No access token cookie",
-      cookieFound: false,
-      allCookies: req.cookies,
-    });
-  }
-});
-
-// Test BlackList
-router.post("/blacklist-token", (req, res) => {
-  console.log("=== ROute Blacklist ===");
-  if (req.cookies.accessToken) {
-    try {
-      blacklistToken(req.cookies.accessToken);
-      res.json({
-        success: true,
-        message: "Token blacklisted",
-      });
-    } catch (error) {
-      console.log("No access token cookie found");
-      res.json({
-        success: false,
-        error: "No access token cookie",
-        cookieFound: false,
-        allCookies: req.cookies,
-      });
-    }
-  }
-});
-
-// rotate token route
-router.post("/session/rotate", requireAuth, rotateTokens);
+// Refresh token: must NOT require a valid access token (that's the whole point
+// of rotation — the access token may already be expired). Only the refresh
+// token cookie is checked, inside the controller.
+router.post("/session/rotate", rotateTokens);
 
 export default router;
